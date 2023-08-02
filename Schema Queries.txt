@@ -1,0 +1,2675 @@
+
+
+
+https://spec.graphql.org/October2021/#sec-Introspection
+
+
+
+{
+	__schema
+	 {
+		description
+		types
+		{
+			name
+ 		}
+	}
+}
+
+//
+
+fragment inputValueFields on __InputValue
+{
+
+	name,
+	description,
+	type
+	{
+		...typeFields
+	},
+	defaultValue
+
+}
+
+fragment fieldFields on __Field {
+	name,
+	description,
+	args
+	{
+		...inputValueFields
+	},
+	type
+	{
+		...typeFields
+	},
+	isDeprecated,
+	deprecationReason: String
+}
+
+fragment typeFields on __Type {
+	name,
+	description,
+	fields
+	{
+		...fieldFields
+	},
+	interfaces
+	{
+		...typeFields
+	},
+	possibleTypes
+	{
+		...typeFields
+	},
+	enumValues
+	{
+		...typeFields
+	},
+	inputFields
+	{
+		...inputValueFields
+	},
+	ofType
+	{
+		...typeFields
+	},
+	specifiedByURL
+}
+
+fragment directiveFields on __Directive {
+	name,
+	description,
+	locations,
+	args:
+	{
+		...inputValueFields
+	},
+	isRepeatable
+}
+
+{
+	__schema
+	 {
+		description
+		types
+		{
+			...typeFields
+ 		},
+ 		queryType
+ 		{
+			...typeFields
+ 		},
+		mutationType
+		{
+			...typeFields
+ 		},
+		subscriptionType
+		{
+			...typeFields
+ 		},
+		directives
+		{
+			...inputValueFields
+		}
+	}
+}
+
+
+//
+
+{
+	"data": null,
+	"errors":
+	[
+		{
+			"message": "  --> 64:2\n   |\n64 | \t{\n   | \t^---\n   |\n   = expected name",
+			"locations":
+			[
+				{
+					"line": 64,
+					"column": 2
+				}
+			]
+		}
+	]
+}
+
+{
+	"data": null,
+	"errors":
+	[
+		{
+			"message": "The recursion depth of the query cannot be greater than `32`",
+			"locations":
+			[
+				{
+					"line": 29,
+					"column": 31
+				}
+			]
+		}
+	]
+}
+
+	{
+ 		value,
+		description
+	},
+
+
+
+
+https://spec.graphql.org/October2021/#sec-Schema-Introspection.Schema-Introspection-Schema
+
+
+
+
+https://graphql.org/learn/introspection/
+
+
+
+{
+  __schema {
+    types {
+      name
+    }
+  }
+}
+
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"types":
+			[
+				{
+					"name": "BoolValue"
+				},
+				{
+					"name": "Boolean"
+				},
+				{
+					"name": "Char"
+				},
+				{
+					"name": "CharValue"
+				},
+				{
+					"name": "F32Value"
+				},
+				{
+					"name": "F64Value"
+				},
+				{
+					"name": "Float"
+				},
+				{
+					"name": "I128Scalar"
+				},
+				{
+					"name": "I128ScalarValue"
+				},
+				{
+					"name": "I16Value"
+				},
+				{
+					"name": "I32Value"
+				},
+				{
+					"name": "I64Value"
+				},
+				{
+					"name": "I8Value"
+				},
+				{
+					"name": "ID"
+				},
+				{
+					"name": "InputWhatever"
+				},
+				{
+					"name": "Int"
+				},
+				{
+					"name": "IsizeValue"
+				},
+				{
+					"name": "MutationRoot"
+				},
+				{
+					"name": "QueryRoot"
+				},
+				{
+					"name": "String"
+				},
+				{
+					"name": "StringValue"
+				},
+				{
+					"name": "U128Scalar"
+				},
+				{
+					"name": "U128ScalarValue"
+				},
+				{
+					"name": "U16Value"
+				},
+				{
+					"name": "U32Value"
+				},
+				{
+					"name": "U64Value"
+				},
+				{
+					"name": "U8Value"
+				},
+				{
+					"name": "UsizeValue"
+				},
+				{
+					"name": "Whatever"
+				},
+				{
+					"name": "__Directive"
+				},
+				{
+					"name": "__DirectiveLocation"
+				},
+				{
+					"name": "__EnumValue"
+				},
+				{
+					"name": "__Field"
+				},
+				{
+					"name": "__InputValue"
+				},
+				{
+					"name": "__Schema"
+				},
+				{
+					"name": "__Type"
+				},
+				{
+					"name": "__TypeKind"
+				}
+			]
+		}
+	}
+}
+
+
+{
+  __schema {
+    queryType {
+      name
+    }
+  }
+}
+
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		}
+	}
+}
+
+
+
+
+{
+  __type(name: "BoolValue") {
+    name
+    kind
+  }
+}
+
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "BoolValue",
+			"kind": "OBJECT"
+		}
+	}
+}
+
+
+
+{
+  __type(name: "Boolean") {
+    name
+    kind
+  }
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "Boolean",
+			"kind": "SCALAR"
+		}
+	}
+}
+
+
+
+
+{
+  __type(name: "Boolean") {
+ 	name
+ 	kind
+  	description
+	specifiedByURL
+  }
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "Boolean",
+			"kind": "SCALAR",
+			"description": "The `Boolean` scalar type represents `true` or `false`.",
+			"specifiedByURL": null
+		}
+	}
+}
+
+
+{
+  __type(name: "BoolValue") {
+ 	name
+ 	kind
+  	description
+	specifiedByURL
+  }
+}
+
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "BoolValue",
+			"kind": "OBJECT",
+			"description": null,
+			"specifiedByURL": null
+		}
+	}
+}
+
+
+{
+    __TypeKind
+}
+
+{
+	"data": null,
+	"errors":
+	[
+		{
+			"message": "Unknown field \"__TypeKind\" on type \"QueryRoot\".",
+			"locations":
+			[
+				{
+					"line": 2,
+					"column": 5
+				}
+			]
+		}
+	]
+}
+
+
+{
+  __type(name: "__TypeKind") {
+ 	name
+ 	kind
+  	description
+	specifiedByURL
+  }
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "__TypeKind",
+			"kind": "ENUM",
+			"description": "An enum describing what kind of type a given `__Type` is.",
+			"specifiedByURL": null
+		}
+	}
+}
+
+//
+
+{
+	__schema
+	{
+		description,
+		types
+		{
+			name
+		},
+		queryType
+		{
+			name
+		},
+		mutationType
+		{
+			name
+		},
+		subscriptionType
+		{
+			name
+		},
+		directives
+		{
+			name
+		}
+	}
+}
+
+query GetType($name: String)
+{
+	__type(name: $name)
+	{
+		name
+		kind
+		description
+		specifiedByURL
+	}
+}
+
+{
+	"name": "String"
+}
+
+Invalid
+
+Unexpected Whitespece encuntered
+
+
+
+Invalid request: data did not match any variant of untagged enum BatchRequest
+
+Invalid
+
+Unexpected Whitespece encuntered
+
+
+query GetType($name: String)
+{
+	__type(name: $name)
+	{
+		name
+		kind
+		description
+		specifiedByURL
+	}
+}
+
+{
+	"name": "String"
+}
+
+Invalid request: data did not match any variant of untagged enum BatchRequest
+
+Invalid
+
+Unexpected Whitespece encuntered
+
+{
+	__type(name: "String")
+	{
+		name
+		kind
+		description
+		specifiedByURL
+	}
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "String",
+			"kind": "SCALAR",
+			"description": "The `String` scalar type represents textual data, represented as UTF-8\ncharacter sequences. The String type is most often used by GraphQL to\nrepresent free-form human-readable text.",
+			"specifiedByURL": null
+		}
+	}
+}
+
+{
+	__type(name: "Whatever")
+	{
+		name
+		kind
+		description
+		specifiedByURL
+	}
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "Whatever",
+			"kind": "UNION",
+			"description": null,
+			"specifiedByURL": null
+		}
+	}
+}
+
+
+
+
+query GetType($name: String = "Whatever")
+{
+	__type(name: $name)
+	{
+		name
+		kind
+		description
+		specifiedByURL
+	}
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "Whatever",
+			"kind": "UNION",
+			"description": null,
+			"specifiedByURL": null
+		}
+	}
+}
+
+//
+
+{
+	__schema
+	{
+
+		types
+		{
+			name
+		},
+		queryType
+		{
+			name
+		},
+		mutationType
+		{
+			name
+		},
+		subscriptionType
+		{
+			name
+		},
+		directives
+		{
+			name
+		}
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"types":
+			[
+				{
+					"name": "BoolValue"
+				},
+				{
+					"name": "Boolean"
+				},
+				{
+					"name": "Char"
+				},
+				{
+					"name": "CharValue"
+				},
+				{
+					"name": "F32Value"
+				},
+				{
+					"name": "F64Value"
+				},
+				{
+					"name": "Float"
+				},
+				{
+					"name": "I128Scalar"
+				},
+				{
+					"name": "I128ScalarValue"
+				},
+				{
+					"name": "I16Value"
+				},
+				{
+					"name": "I32Value"
+				},
+				{
+					"name": "I64Value"
+				},
+				{
+					"name": "I8Value"
+				},
+				{
+					"name": "ID"
+				},
+				{
+					"name": "InputWhatever"
+				},
+				{
+					"name": "Int"
+				},
+				{
+					"name": "IsizeValue"
+				},
+				{
+					"name": "MutationRoot"
+				},
+				{
+					"name": "QueryRoot"
+				},
+				{
+					"name": "String"
+				},
+				{
+					"name": "StringValue"
+				},
+				{
+					"name": "U128Scalar"
+				},
+				{
+					"name": "U128ScalarValue"
+				},
+				{
+					"name": "U16Value"
+				},
+				{
+					"name": "U32Value"
+				},
+				{
+					"name": "U64Value"
+				},
+				{
+					"name": "U8Value"
+				},
+				{
+					"name": "UsizeValue"
+				},
+				{
+					"name": "Whatever"
+				},
+				{
+					"name": "__Directive"
+				},
+				{
+					"name": "__DirectiveLocation"
+				},
+				{
+					"name": "__EnumValue"
+				},
+				{
+					"name": "__Field"
+				},
+				{
+					"name": "__InputValue"
+				},
+				{
+					"name": "__Schema"
+				},
+				{
+					"name": "__Type"
+				},
+				{
+					"name": "__TypeKind"
+				}
+			],
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		},
+		"mutationType":
+		{
+			"name": "MutationRoot"
+		}
+	},
+	"subscriptionType": null,
+	"directives":
+	[
+		{
+			"name": "include"
+		},
+		{
+			"name": "skip"
+		}
+	]
+}
+
+//
+
+{
+	__schema
+	{
+	
+		types
+		{
+			name
+		},
+
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"types":
+			[
+				{
+					"name": "BoolValue"
+				},
+				{
+					"name": "Boolean"
+				},
+				{
+					"name": "Char"
+				},
+				{
+					"name": "CharValue"
+				},
+				{
+					"name": "F32Value"
+				},
+				{
+					"name": "F64Value"
+				},
+				{
+					"name": "Float"
+				},
+				{
+					"name": "I128Scalar"
+				},
+				{
+					"name": "I128ScalarValue"
+				},
+				{
+					"name": "I16Value"
+				},
+				{
+					"name": "I32Value"
+				},
+				{
+					"name": "I64Value"
+				},
+				{
+					"name": "I8Value"
+				},
+				{
+					"name": "ID"
+				},
+				{
+					"name": "InputWhatever"
+				},
+				{
+					"name": "Int"
+				},
+				{
+					"name": "IsizeValue"
+				},
+				{
+					"name": "MutationRoot"
+				},
+				{
+					"name": "QueryRoot"
+				},
+				{
+					"name": "String"
+				},
+				{
+					"name": "StringValue"
+				},
+				{
+					"name": "U128Scalar"
+				},
+				{
+					"name": "U128ScalarValue"
+				},
+				{
+					"name": "U16Value"
+				},
+				{
+					"name": "U32Value"
+				},
+				{
+					"name": "U64Value"
+				},
+				{
+					"name": "U8Value"
+				},
+				{
+					"name": "UsizeValue"
+				},
+				{
+					"name": "Whatever"
+				},
+				{
+					"name": "__Directive"
+				},
+				{
+					"name": "__DirectiveLocation"
+				},
+				{
+					"name": "__EnumValue"
+				},
+				{
+					"name": "__Field"
+				},
+				{
+					"name": "__InputValue"
+				},
+				{
+					"name": "__Schema"
+				},
+				{
+					"name": "__Type"
+				},
+				{
+					"name": "__TypeKind"
+				}
+			]
+		}
+	}
+}
+
+//
+
+{
+	__schema
+	{
+		queryType
+		{
+			name
+		}
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		}
+	}
+}
+
+//
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		}
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		}
+	}
+}
+
+//
+
+{
+	__schema
+	{
+		mutationType
+		{
+			name
+		}
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"mutationType":
+			{
+				"name": "MutationRoot"
+			}
+		}
+	}
+}
+
+//
+
+{
+	__schema
+	{
+		subscriptionType
+		{
+			name
+		}
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"subscriptionType": null
+		}
+	}
+}
+
+//
+
+{
+	__schema
+	{
+		directives
+		{
+			name
+		}
+	}
+}
+		
+{
+	"data":
+	{
+		"__schema":
+		{
+			"directives":
+			[
+				{
+					"name": "include"
+				},
+				{
+					"name": "skip"
+				}
+			]
+		}
+	}
+}
+
+//
+
+{
+	__schema
+	{
+		description,
+		directives
+		{
+			name
+		}
+	}
+}
+
+{
+	"data": null,
+	"errors":
+	[
+		{
+			"message": "Unknown field \"description\" on type \"__Schema\". Did you mean \"subscriptionType\"?",
+			"locations":
+			[
+				{
+					"line": 4,
+					"column": 3
+				}
+			]
+		}
+	]
+}
+
+//
+
+{
+	__schema
+	{
+		description
+	}
+}
+
+{
+	"data": null,
+	"errors":
+	[
+		{
+			"message": "Unknown field \"description\" on type \"__Schema\". Did you mean \"subscriptionType\"?",
+			"locations":
+			[
+				{
+					"line": 4,
+					"column": 3
+				}
+			]
+		}
+	]
+}
+
+//
+
+{
+	__schema
+	{
+		queryType
+		{
+			name
+		},
+		mutationType
+		{
+			name
+		},
+		subscriptionType
+		{
+			name
+		},
+		directives
+		{
+			name
+		},
+		types
+		{
+			name
+		},
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		},
+		"mutationType":
+		{
+			"name": "MutationRoot"
+		}
+	},
+	"subscriptionType": null,
+	"directives":
+	[
+		{
+			"name": "include"
+		},
+		{
+			"name": "skip"
+		}
+	],
+	"types":
+	[
+		{
+			"name": "BoolValue"
+		},
+		{
+			"name": "Boolean"
+		},
+		{
+			"name": "Char"
+		},
+		{
+			"name": "CharValue"
+		},
+		{
+			"name": "F32Value"
+		},
+		{
+			"name": "F64Value"
+		},
+		{
+			"name": "Float"
+		},
+		{
+			"name": "I128Scalar"
+		},
+		{
+			"name": "I128ScalarValue"
+		},
+		{
+			"name": "I16Value"
+		},
+		{
+			"name": "I32Value"
+		},
+		{
+			"name": "I64Value"
+		},
+		{
+			"name": "I8Value"
+		},
+		{
+			"name": "ID"
+		},
+		{
+			"name": "InputWhatever"
+		},
+		{
+			"name": "Int"
+		},
+		{
+			"name": "IsizeValue"
+		},
+		{
+			"name": "MutationRoot"
+		},
+		{
+			"name": "QueryRoot"
+		},
+		{
+			"name": "String"
+		},
+		{
+			"name": "StringValue"
+		},
+		{
+			"name": "U128Scalar"
+		},
+		{
+			"name": "U128ScalarValue"
+		},
+		{
+			"name": "U16Value"
+		},
+		{
+			"name": "U32Value"
+		},
+		{
+			"name": "U64Value"
+		},
+		{
+			"name": "U8Value"
+		},
+		{
+			"name": "UsizeValue"
+		},
+		{
+			"name": "Whatever"
+		},
+		{
+			"name": "__Directive"
+		},
+		{
+			"name": "__DirectiveLocation"
+		},
+		{
+			"name": "__EnumValue"
+		},
+		{
+			"name": "__Field"
+		},
+		{
+			"name": "__InputValue"
+		},
+		{
+			"name": "__Schema"
+		},
+		{
+			"name": "__Type"
+		},
+		{
+			"name": "__TypeKind"
+		}
+	]
+}
+
+//
+
+{
+	__schema
+	{
+		name,
+		queryType
+		{
+			name
+		},
+		mutationType
+		{
+			name
+		},
+		subscriptionType
+		{
+			name
+		},
+		directives
+		{
+			name
+		},
+		types
+		{
+			name
+		},
+	}
+}
+
+{
+	"data": null,
+	"errors":
+	[
+		{
+			"message": "Unknown field \"name\" on type \"__Schema\".",
+			"locations":
+			[
+				{
+					"line": 4,
+					"column": 3
+				}
+			]
+		}
+	]
+}
+
+//
+
+{
+	__schema
+	{
+		types
+		{
+			name,
+			kind
+		},
+		queryType
+		{
+			name
+		},
+		mutationType
+		{
+			name
+		},
+		subscriptionType
+		{
+			name
+		},
+		directives
+		{
+			name
+		}
+	}
+}
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"types":
+			[
+				{
+					"name": "BoolValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "Boolean",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "Char",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "CharValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "F32Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "F64Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "Float",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "I128Scalar",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "I128ScalarValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I16Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I32Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I64Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I8Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "ID",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "InputWhatever",
+					"kind": "INPUT_OBJECT"
+				},
+				{
+					"name": "Int",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "IsizeValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "MutationRoot",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "QueryRoot",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "String",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "StringValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U128Scalar",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "U128ScalarValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U16Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U32Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U64Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U8Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "UsizeValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "Whatever",
+					"kind": "UNION"
+				},
+				{
+					"name": "__Directive",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__DirectiveLocation",
+					"kind": "ENUM"
+				},
+				{
+					"name": "__EnumValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__Field",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__InputValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__Schema",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__Type",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__TypeKind",
+					"kind": "ENUM"
+				}
+			],
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		},
+		"mutationType":
+		{
+			"name": "MutationRoot"
+		}
+	},
+	"subscriptionType": null,
+	"directives":
+	[
+		{
+			"name": "include"
+		},
+		{
+			"name": "skip"
+		}
+	]
+}
+
+//
+
+With an exposed Hashmap in a query object a JSONObject appears!
+
+{
+	"data":
+	{
+		"__schema":
+		{
+			"types":
+			[
+				{
+					"name": "BoolValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "Boolean",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "Char",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "CharValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "F32Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "F64Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "Float",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "I128Scalar",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "I128ScalarValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I16Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I32Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I64Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "I8Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "ID",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "InputWhatever",
+					"kind": "INPUT_OBJECT"
+				},
+				{
+					"name": "Int",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "IsizeValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "JSONObject",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "MutationRoot",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "QueryRoot",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "String",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "StringValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U128Scalar",
+					"kind": "SCALAR"
+				},
+				{
+					"name": "U128ScalarValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U16Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U32Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U64Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "U8Value",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "UsizeValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "Whatever",
+					"kind": "UNION"
+				},
+				{
+					"name": "__Directive",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__DirectiveLocation",
+					"kind": "ENUM"
+				},
+				{
+					"name": "__EnumValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__Field",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__InputValue",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__Schema",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__Type",
+					"kind": "OBJECT"
+				},
+				{
+					"name": "__TypeKind",
+					"kind": "ENUM"
+				}
+			],
+			"queryType":
+			{
+				"name": "QueryRoot"
+			}
+		},
+		"mutationType":
+		{
+			"name": "MutationRoot"
+		}
+	},
+	"subscriptionType": null,
+	"directives":
+	[
+		{
+			"name": "include"
+		},
+		{
+			"name": "skip"
+		}
+	]
+}
+
+//
+
+General type information:
+
+query GetType($name: String)
+{
+	__type(name: $name)
+	{
+		name
+		kind
+		description
+	}
+}
+
+{
+	"name": "String"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "String",
+			"kind": "SCALAR",
+			"description": "The `String` scalar type represents textual data, represented as UTF-8\ncharacter sequences. The String type is most often used by GraphQL to\nrepresent free-form human-readable text."
+		}
+	}
+}
+
+{
+	"name": "BoolValue"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "BoolValue",
+			"kind": "OBJECT",
+			"description": null
+		}
+	}
+}
+
+{
+	"name": "Whatever"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "Whatever",
+			"kind": "UNION",
+			"description": null
+		}
+	}
+}
+
+{
+	"name": "CharValue"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "CharValue",
+			"kind": "OBJECT",
+			"description": null
+		}
+	}
+}
+
+{
+	"name": "Int"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "Int",
+			"kind": "SCALAR",
+			"description": "The `Int` scalar type represents non-fractional whole numeric values."
+		}
+	}
+}
+
+{
+	"name": "ID"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"name": "ID",
+			"kind": "SCALAR",
+			"description": null
+		}
+	}
+}
+
+//
+
+Intrinsics:
+
+Input:
+
+Int - Scalar
+Float - Scalar
+String - Scalar
+Boolean - Scalar
+Null - Scalar
+
+Output:
+
+ID - Scalar
+
+Plus anything prepended with __
+
+Then:
+
+Enum - Enum
+List - List
+Object - Object
+
+General query:
+
+query GetType($name: String)
+{
+	__type(name: $name)
+	{
+		kind
+		name
+		description
+	}
+}
+
+
+
+OBJECT type kind:
+
+query GetObjectType($name: String, $includeDeprecated: Boolean = false)
+{
+
+	__type(name: $name)
+	{
+		description,
+		fields(includeDeprecated: $includeDeprecated)
+		{
+			name
+			description
+			args
+			{
+				name
+				description
+				type
+				{
+					kind
+					name
+				}
+				defaultValue
+			
+			}
+			type
+			{
+				kind
+				name
+			}
+			isDeprecated
+			deprecationReason
+		}	
+	}
+}
+
+//
+
+{
+	"name": "BoolValue"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"description": null,
+			"fields":
+			[
+				{
+					"name": "value",
+					"description": null,
+					"args":
+					[
+					],
+					"type":
+					{
+						"kind": "NON_NULL",
+						"name": null
+					},
+					"isDeprecated": false,
+					"deprecationReason": null
+				}
+			]
+		}
+	}
+}
+
+//
+
+OBJECT type kind (no fields):
+
+query GetObjectType($name: String, $includeDeprecated: Boolean = false)
+{
+	__type(name: $name)
+	{
+		description	
+	}
+}
+
+//
+
+INTERFACE type kind:
+
+query GetInterfaceType($name: String, $includeDeprecated: Boolean = false)
+{
+	__type(name: $name)
+	{
+		description,
+		fields(includeDeprecated: $includeDeprecated)
+		{
+			name
+			description
+			args
+			{
+				name
+				description
+				type
+				{
+					kind
+					name
+				}
+				defaultValue
+			
+			}
+			type
+			{
+				kind
+				name
+			}
+			isDeprecated
+			deprecationReason
+		}
+		interfaces
+		{
+			kind
+			name
+		}
+		possibleTypes
+		{
+			kind
+			name
+		}
+	}
+}
+
+UNION type kind:
+
+query GetUnionType($name: String)
+{
+	__type(name: $name)
+	{
+		description
+		possibleTypes
+		{
+			kind
+			name
+		}
+	}	
+}
+
+//
+
+{
+	"name": "Whatever"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"description": null,
+			"possibleTypes":
+			[
+				{
+					"kind": "OBJECT",
+					"name": "BoolValue"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "CharValue"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "F32Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "F64Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "I8Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "I16Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "I32Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "I64Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "I128ScalarValue"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "IsizeValue"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "U8Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "U16Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "U32Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "U64Value"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "U128ScalarValue"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "UsizeValue"
+				},
+				{
+					"kind": "OBJECT",
+					"name": "StringValue"
+				}
+			]
+		}
+	}
+}
+
+//
+
+ENUM type kind:
+
+query GetEnumType($name: String, $includeDeprecated: Boolean = false)
+{
+	__type(name: $name)
+	{
+		description
+		enumValues(includeDeprecated: $includeDeprecated)
+		{
+			name
+  			description
+  			isDeprecated
+  			deprecationReason
+		}
+	}	
+}
+
+//
+
+{
+	"name": "__DirectiveLocation"
+}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"description": "A Directive can be adjacent to many parts of the GraphQL language, a\n__DirectiveLocation describes one such possible adjacencies.",
+			"enumValues":
+			[
+				{
+					"name": "QUERY",
+					"description": "Location adjacent to a query operation.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "MUTATION",
+					"description": "Location adjacent to a mutation operation.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "SUBSCRIPTION",
+					"description": "Location adjacent to a subscription operation.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "FIELD",
+					"description": "Location adjacent to a field.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "FRAGMENT_DEFINITION",
+					"description": "Location adjacent to a fragment definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "FRAGMENT_SPREAD",
+					"description": "Location adjacent to a fragment spread.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "INLINE_FRAGMENT",
+					"description": "Location adjacent to an inline fragment.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "VARIABLE_DEFINITION",
+					"description": "Location adjacent to a variable definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "SCHEMA",
+					"description": "Location adjacent to a schema definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "SCALAR",
+					"description": "Location adjacent to a scalar definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "OBJECT",
+					"description": "Location adjacent to an object type definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "FIELD_DEFINITION",
+					"description": "Location adjacent to a field definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "ARGUMENT_DEFINITION",
+					"description": "Location adjacent to an argument definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "INTERFACE",
+					"description": "Location adjacent to an interface definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "UNION",
+					"description": "Location adjacent to a union definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "ENUM",
+					"description": "Location adjacent to an enum definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "ENUM_VALUE",
+					"description": "Location adjacent to an enum value definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "INPUT_OBJECT",
+					"description": "Location adjacent to an input object type definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				},
+				{
+					"name": "INPUT_FIELD_DEFINITION",
+					"description": "Location adjacent to an input object field definition.",
+					"isDeprecated": false,
+					"deprecationReason": null
+				}
+			]
+		}
+	}
+}
+
+//
+
+INPUT_OBJECT type kind:
+
+query GetInputObjectType($name: String)
+{
+	__type(name: $name)
+	{
+		description
+		inputFields
+		{
+			name
+  			description
+  			type
+  			{
+				kind
+				name
+			}
+  			defaultValue
+		}
+	}	
+}
+
+//
+
+{
+	"name": "InputWhatever"
+}
+
+Error:
+
+{"data":{"__type":{"description":null,"inputFields":[{"name":"bool","description":null,"type":{"kind":"SCALAR","name":"Boolean"},"defaultValue":null},{"name":"char","description":null,"type":{"kind":"SCALAR","name":"Char"},"defaultValue":null},{"name":"f32","description":null,"type":{"kind":"SCALAR","name":"Float"},"defaultValue":null},{"name":"f64","description":null,"type":{"kind":"SCALAR","name":"Float"},"defaultValue":null},{"name":"i8","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"i16","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"i32","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"i64","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"i128","description":null,"type":{"kind":"SCALAR","name":"I128Scalar"},"defaultValue":null},{"name":"isize","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"u8","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"u16","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"u32","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"u64","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"u128","description":null,"type":{"kind":"SCALAR","name":"U128Scalar"},"defaultValue":null},{"name":"usize","description":null,"type":{"kind":"SCALAR","name":"Int"},"defaultValue":null},{"name":"string","description":null,"type":{"kind":"SCALAR","name":"String"},"defaultValue":null}]}}}
+
+{
+	"data":
+	{
+		"__type":
+		{
+			"description": null,
+			"inputFields":
+			[
+				{
+					"name": "bool",
+					"description": null,
+					"type":
+					{
+						"kind": "SCALAR",
+						"name": "Boolean"
+					}
+				},
+				"defaultValue"
+
+Error: Expected comma or closing curly or sqare bracket
+
+Premature object closing error fixed:
+
+{
+        "data":
+        {
+                "__type":
+                {
+                        "description": null,
+                        "inputFields":
+                        [
+                                {
+                                        "name": "bool",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Boolean"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "char",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Char"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "f32",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Float"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "f64",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Float"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "i8",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "i16",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "i32",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "i64",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "i128",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "I128Scalar"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "isize",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "u8",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "u16",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "u32",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "u64",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "u128",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "U128Scalar"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "usize",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null,
+                                        "name": "string",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "String"
+                                        },
+                                        "defaultValue": null
+                                }                               }
+
+Error: Unexpected char encountered
+
+//
+
+Works Now!
+
+{
+        "data":
+        {
+                "__type":
+                {
+                        "description": null,
+                        "inputFields":
+                        [
+                                {
+                                        "name": "bool",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Boolean"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "char",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Char"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "f32",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Float"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "f64",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Float"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "i8",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "i16",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "i32",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "i64",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "i128",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "I128Scalar"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "isize",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "u8",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "u16",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "u32",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "u64",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "u128",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "U128Scalar"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "usize",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "Int"
+                                        },
+                                        "defaultValue": null
+                                },
+                                {
+                                        "name": "string",
+                                        "description": null,
+                                        "type":
+                                        {
+                                                "kind": "SCALAR",
+                                                "name": "String"
+                                        },
+                                        "defaultValue": null
+                                }
+                        ]
+                }
+        }
+}
+
+//
+
+NON_NULL and LIST type kinds:
+
+query NonNullOrList($name: String)
+{
+	__type(name: $name)
+	{
+		description
+		ofType
+		{
+			kind
+			name
+		}
+	}	
+}
+
+custom SCALAR type kinds:
+
+query CustomScalar($name: String)
+{
+	__type(name: $name)
+	{
+		description
+		specifiedByURL
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
