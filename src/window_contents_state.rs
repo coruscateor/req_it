@@ -1,18 +1,23 @@
 
 use std::cell::RefCell;
+
 use std::rc::{Weak, Rc};
+
 use std::time::Duration;
 
 use gtk_estate::corlib::events::SenderEventFunc;
+
 use gtk_estate::corlib::rc_default::RcDefault;
-use gtk_estate::gtk4::traits::{BoxExt, WidgetExt};
-use gtk_estate::{HasObject, impl_has_box, impl_has_object, StateContainers}; //get_state_containers, 
+
+use gtk_estate::gtk4::prelude::{BoxExt, WidgetExt};
+
+use gtk_estate::{StateContainers, StoredWidgetObject, WidgetAdapter, WidgetStateContainer}; //HasObject, impl_has_box, impl_has_object, //get_state_containers, 
 
 use gtk_estate::gtk4::{self as gtk, Box, Orientation, Label, BaselinePosition, Align};
 
 use gtk_estate::adw::{Application, ApplicationWindow, HeaderBar, WindowTitle, prelude::AdwApplicationWindowExt, gtk::prelude::ApplicationWindowExt, gtk::prelude::GtkWindowExt};
 
-use gtk_estate::corlib::{NonOption, rc_self_setup}; //, rc_self_refcell_setup};
+use gtk_estate::corlib::{impl_as_any, rc_self_setup, NonOption, as_any::AsAny}; //, rc_self_refcell_setup};
 
 use gtk_estate::time_out::*;
 
@@ -24,16 +29,19 @@ use tokio::runtime::{Runtime, Handle, Builder};
 
 use gtk_estate::gtk4::glib::object::Cast;
 
-use crate::applicaion_state::ApplicattionState;
+use crate::applicaion_state::ApplicationState;
+
+use std::any::Any;
 
 //use time::OffsetDateTime;
 
 pub struct WindowContentsState
 {
 
-    weak_self: RefCell<NonOption<Weak<Self>>>,
+    //weak_self: RefCell<NonOption<Weak<Self>>>,
+    adapted_contents_box: Rc<WidgetAdapter<Box, WindowContentsState>>,
     contents_box: Box,
-    app_window: ApplicationWindow,
+    //app_window: ApplicationWindow,
     window_title: WindowTitle,
     hb: HeaderBar,
     //unix_time_label: Label,
@@ -48,7 +56,7 @@ pub struct WindowContentsState
 impl WindowContentsState
 {
 
-    pub fn new(app_window: &ApplicationWindow) -> Rc<Self>
+    pub fn new() -> Rc<Self> //(app_window: &ApplicationWindow) -> Rc<Self>
     {
 
         let contents_box = Box::new(Orientation::Vertical, 0);
@@ -103,51 +111,65 @@ impl WindowContentsState
 
         {
 
-            let application = app_window.application().unwrap();
+            //let application = app_window.application().unwrap();
 
             //let adw_application: Application = application.into();
     
-            let adw_application = application.downcast_ref::<Application>().unwrap(); //application as Application;
+            //let adw_application = application.downcast_ref::<Application>().unwrap(); //application as Application;
     
-            let applications = scs.adw().borrow_applications();
+            //let applications = scs.adw().borrow_applications();
 
-            let app_state = applications.get(&adw_application).unwrap();
+            //let app_state = applications.get(&adw_application).unwrap();
     
-            let app_state_ref = app_state.downcast_ref::<ApplicattionState>().unwrap();
-    
+            //let app_state = scs.application_state();
+
+            //let app_state_ref = app_state.downcast_ref::<ApplicattionState>().unwrap();
+
+            //let app_state_ref = app_state.as_any().downcast_ref::<ApplicationState>().expect("Error: Not ApplicattionState!");
+
+            let app_state = scs.application_state();
+
+            let app_state_ref = app_state.as_any().downcast_ref::<ApplicationState>().expect("Error: Not ApplicattionState!");
+            
             tokio_rt_handle = app_state_ref.clone_tokio_rt_handle();
 
         }
 
-        let this = Self
+        let this = Rc::new_cyclic( move |weak_self|
         {
 
-            weak_self: NonOption::invalid_rfc(), //invalid_refcell(),
-            contents_box,
-            app_window: app_window.clone(),
-            window_title,
-            hb,
-            //unix_time_label,
-            //internal_content,
-            //time_out
-            tv,
-            tb,
-            //Add refcell for mutable state
-            tokio_rt_handle
+            Self
+            {
 
-        };
+                //weak_self: NonOption::invalid_rfc(), //invalid_refcell(),
+                adapted_contents_box: WidgetAdapter::new(&contents_box, weak_self),
+                contents_box,
+                //app_window: app_window.clone(),
+                window_title,
+                hb,
+                //unix_time_label,
+                //internal_content,
+                //time_out
+                tv,
+                tb,
+                //Add refcell for mutable state
+                tokio_rt_handle
 
-        let rc_self = Rc::new(this); //Rc::new(RefCell::new(this));
+            }
+
+        });
+
+        //let rc_self = Rc::new(this); //Rc::new(RefCell::new(this));
 
         //setup weak self reference
 
         //rc_self_refcell_setup!(rc_self, weak_self);
 
-        rc_self_setup!(rc_self, weak_self);
+        //rc_self_setup!(rc_self, weak_self);
 
         //get the state containers singletion
 
-        //let scs = StateContainers::get(); //get_state_containers();
+        let scs = StateContainers::get(); //get_state_containers();
 
         //add this to the GTK boxes state
 
@@ -155,28 +177,32 @@ impl WindowContentsState
 
         //scs.get_gtk_ref().get_boxes_mut().add(&rc_self);
 
-        scs.gtk().borrow_mut_boxes().add(&rc_self); //add_refcell(&rc_self);
+        //scs.gtk().borrow_mut_boxes().add(&rc_self); //add_refcell(&rc_self);
+
+        scs.add(&this);
 
         //let weak_self = rc_self.weak_self.clone();
 
-        rc_self.tv.connect_close_page(|this, tp|
+        this.tv.connect_close_page(|this, tp|
         {
 
             //Show message box if query is not saved
             
             //
 
-            let scs = StateContainers::get();
+            //let scs = StateContainers::get();
 
             //Remove state
 
             //scs.get_adw_ref().get_tab_pages_mut().remove(tp);
 
-            scs.adw().borrow_mut_tab_pages().remove(&tp);
+            //scs.adw().borrow_mut_tab_pages().remove(&tp);
 
             //finish
 
             this.close_page_finish(tp, true);                
+
+            //When a tab closes it should automatically remove itself from the StateContainers.
 
             true
 
@@ -228,17 +254,19 @@ impl WindowContentsState
 
         */
 
-        app_window.set_content(Some(&rc_self.contents_box));
+        //app_window.set_content(Some(&this.contents_box));
 
         //Append a tab
 
-        let new_gql_ts = GraphQLTabState::new(&rc_self.tv, &rc_self.tokio_rt_handle);
+        let new_gql_ts = GraphQLTabState::new(&this.tv, &this.tokio_rt_handle);
 
         //Center the main contents paned widget
 
+        //https://gtk-rs.org/gtk4-rs/stable/latest/docs/gtk4/prelude/trait.WidgetExt.html#method.connect_parent_notify
+
         new_gql_ts.set_contents_paned_position_halved(app_window.default_width());
 
-        {
+        //{
 
             //let ql_ts_borrowed = new_gql_ts.borrow();
 
@@ -246,7 +274,7 @@ impl WindowContentsState
 
             //ql_ts_borrowed.set_contents_paned_position_halved(app_window.default_width());
 
-        }     
+        //}     
 
         //rc_self.time_out.set_reoccurs(true);
 
@@ -254,7 +282,7 @@ impl WindowContentsState
 
         //done!
 
-        rc_self
+        this
 
     }
 
@@ -269,5 +297,19 @@ impl WindowContentsState
 
 }
 
-impl_has_box!(contents_box, WindowContentsState);
+impl_as_any!(WindowContentsState);
+
+impl WidgetStateContainer for WindowContentsState
+{
+
+    fn dyn_adapter(&self) -> Rc<dyn StoredWidgetObject>
+    {
+
+        self.adapted_contents_box.clone()
+
+    }
+
+}
+
+//impl_has_box!(contents_box, WindowContentsState);
 

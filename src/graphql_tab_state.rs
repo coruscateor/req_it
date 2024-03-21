@@ -1,17 +1,26 @@
 use std::cell::RefCell;
+
 use std::rc::{Weak, Rc};
+
+use std::any::Any;
+
 use std::sync::mpsc::TryRecvError;
+
 use std::time::Duration;
 
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
-use gtk_estate::gtk4::glib::clone::Downgrade;
-use gtk_estate::{HasObject, StateContainers, impl_has_object, impl_has_tab_page, helpers::*, SimpleTimeOut, RcSimpleTimeOut}; //time_out::{TimeOut, RcTimeOut}};
+
+//use gtk_estate::gtk4::glib::clone::Downgrade;
+
+//HasObject, impl_has_object, impl_has_tab_page,
+
+use gtk_estate::{helpers::*, RcSimpleTimeOut, SimpleTimeOut, StateContainers, StoredWidgetObject, WidgetAdapter, WidgetStateContainer}; //time_out::{TimeOut, RcTimeOut}};
 
 use gtk_estate::gtk4::{self as gtk, Box, Orientation, TextView, Paned, Notebook, Label, CenterBox, DropDown, StringList, Text, Button, Viewport, ScrolledWindow, prelude::{BoxExt, TextViewExt, TextBufferExt, WidgetExt, EntryBufferExtManual, ButtonExt}};
 
 use gtk_estate::adw::{TabBar, TabPage, TabView};
 
-use gtk_estate::corlib::{NonOption, rc_self_setup}; //rc_self_refcell_setup};
+use gtk_estate::corlib::{impl_as_any, rc_self_setup, AsAny}; //rc_self_refcell_setup};
 
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
@@ -55,18 +64,22 @@ use tokio::sync::oneshot::{Sender, Receiver, channel};
 
 use gtk_estate::corlib::impl_rfc_get_weak_self;
 
+use gtk::glib;
+
+use gtk::glib::clone;
+
 type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
 
 pub struct GraphQLTabState
 {
 
-    weak_self: RefCell<NonOption<Weak<Self>>>, //<RefCell<Self>>>,
-    contents_box: Box,
+    //weak_self: RefCell<NonOption<Weak<Self>>>,
+    //contents_box: Box,
+    adapted_contents_box: Rc<WidgetAdapter<Box, GraphQLTabState>>,
     tp: TabPage,
 
     //Header
 
-    //verb_drop_down: DropDown,
     address_text: Text,
     run_button: Button,
     time_output_label: Label,
@@ -178,7 +191,7 @@ impl GraphQLTabState
         //Left
 
         //Center
-
+        
         let tool_center_box = Box::new(Orientation::Horizontal, 2);
 
         let run_button = Button::builder().label("Run").build(); //ButtonBuilder::new().label("Run").build();
@@ -404,58 +417,64 @@ impl GraphQLTabState
 
         let graphql_post_actor = GraphQLRuntimeActor::new(tokio_rt_handle_ref, actor_state);
   
-        let this = Self
+        let this =  Rc::new_cyclic( move |weak_self|
         {
 
-            weak_self: NonOption::invalid_rfc(), //invalid_refcell(),
-            contents_box,
-            tp,
-            
-            //Header
+            Self
+            {
 
-            //verb_drop_down,
-            address_text,
-            run_button,
-            time_output_label,
+                //weak_self: NonOption::invalid_rfc(), //invalid_refcell(),
+                //contents_box,
+                adapted_contents_box: WidgetAdapter::new(&contents_box, weak_self),
+                tp,
+                
+                //Header
 
-            //Tabpage
+                //verb_drop_down,
+                address_text,
+                run_button,
+                time_output_label,
 
-            //Top Left
+                //Tabpage
 
-            query_text,
+                //Top Left
 
-            //Bottom Left - tabs
+                query_text,
 
-            query_variables,
-            http_headers,
+                //Bottom Left - tabs
 
-            //Top Right
+                query_variables,
+                http_headers,
 
-            results_text,
+                //Top Right
 
-            //Bottom Right
+                results_text,
 
-            tracing_text,
+                //Bottom Right
 
-            //
-            
-            contents_paned,
-            query_paned,
-            results_paned,
-            graphql_post_actor,
-            tokio_rt_handle: tokio_rt_handle_ref.clone(),
-            graphql_post_request_job: RefCell::new(None),
-            graphql_post_request_job_timeout: SimpleTimeOut::new(Duration::new(1, 0)) //TimeOut::new(Duration::new(1, 0), true)
+                tracing_text,
 
-        };
+                //
+                
+                contents_paned,
+                query_paned,
+                results_paned,
+                graphql_post_actor,
+                tokio_rt_handle: tokio_rt_handle_ref.clone(),
+                graphql_post_request_job: RefCell::new(None),
+                graphql_post_request_job_timeout: SimpleTimeOut::new(Duration::new(1, 0)) //TimeOut::new(Duration::new(1, 0), true)
+
+            }
+
+        });
 
         //Setup rc_self
 
-        let rc_self = Rc::new(this); //(RefCell::new(this));
+        //let rc_self = Rc::new(this); //(RefCell::new(this));
 
         //rc_self_refcell_setup!(rc_self, weak_self);
 
-        rc_self_setup!(rc_self, weak_self);
+        //rc_self_setup!(rc_self, weak_self);
 
         //
 
@@ -467,16 +486,31 @@ impl GraphQLTabState
 
         //Add to application tab pages
 
-        scs.adw().borrow_mut_tab_pages().add(&rc_self); //_refcell(
+        //scs.adw().borrow_mut_tab_pages().add(&rc_self); //_refcell(
+
+        //Add to the the state containers
+
+        scs.add(&this);
 
         //Run Button
 
-        let weak_self = rc_self.downgrade(); //.weak_self.borrow().get_ref().clone();
+        let weak_self = this.adapted_contents_box.weak_parent(); //rc_self.downgrade(); //.weak_self.borrow().get_ref().clone();
 
-        rc_self.run_button.connect_clicked(move |_btn|
+        let weak_self_mv = weak_self.clone();
+
+        /*
+        this.run_button.connect_clicked(clone!(@weak weak_self => move |_btn|
+        {
+        }));
+        */
+
+        //this.run_button.connect_clicked(clone!(@weak weak_self => move |_btn|
+        this.run_button.connect_clicked(move |_btn|
         {
 
-            if let Some(this) = weak_self.upgrade()
+            //weak_self.
+
+            if let Some(this) = weak_self_mv.upgrade()
             {
 
                 //Return if thed job is already active
@@ -553,9 +587,10 @@ impl GraphQLTabState
 
         //TimeOut
 
-        let weak_self = rc_self.downgrade(); //.get_weak_self();
+        //let weak_self = rc_self.downgrade(); //.get_weak_self();
 
-        rc_self.graphql_post_request_job_timeout.set_function(move |_sto| {
+        //this.graphql_post_request_job_timeout.set_function(clone!(@weak weak_self => move |_sto| {
+        this.graphql_post_request_job_timeout.set_function(move |_sto| {
 
             if let Some(this) = weak_self.upgrade()
             {
@@ -692,7 +727,7 @@ impl GraphQLTabState
 
         });
 
-        rc_self
+        this
 
     }
 
@@ -707,12 +742,26 @@ impl GraphQLTabState
 
     }
 
-    impl_rfc_get_weak_self!();
+    //impl_rfc_get_weak_self!();
 
 
 }
 
-impl_has_tab_page!(tp, GraphQLTabState);
+impl_as_any!(GraphQLTabState);
+
+impl WidgetStateContainer for GraphQLTabState
+{
+
+    fn dyn_adapter(&self) -> Rc<dyn StoredWidgetObject>
+    {
+
+        self.adapted_contents_box.clone()
+
+    }
+
+}
+
+//impl_has_tab_page!(tp, GraphQLTabState);
 
 
 //gtk_estate

@@ -1,10 +1,10 @@
 mod applicaion_state;
 
-mod window_state;
+//mod window_state;
 
 use gtk_estate::{adw::{prelude::*, Application}, StateContainers};
 
-use crate::applicaion_state::ApplicattionState;
+use crate::applicaion_state::ApplicationState;
 
 mod window_contents_state;
 
@@ -21,11 +21,11 @@ fn main()
 
     //The static mut vaiable contains a weak reference to the below reference counted StateContainers instance
 
-    let _sc = StateContainers::new();
-
-    //let teas = 
+    //let _sc = StateContainers::new();
     
-    ApplicattionState::new(&app);
+    StateContainers::init();
+
+    ApplicationState::new(&app);
 
     app.run();
 
