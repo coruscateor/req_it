@@ -5,6 +5,9 @@ use std::rc::{Weak, Rc};
 
 use std::time::Duration;
 
+use gtk_estate::adw::ffi::AdwBreakpointBin;
+use gtk_estate::adw::glib::clone;
+use gtk_estate::adw::glib::object::ObjectExt;
 use gtk_estate::corlib::events::SenderEventFunc;
 
 use gtk_estate::corlib::rc_default::RcDefault;
@@ -40,7 +43,7 @@ pub struct WindowContentsState
 
     //weak_self: RefCell<NonOption<Weak<Self>>>,
     adapted_contents_box: Rc<WidgetAdapter<Box, WindowContentsState>>,
-    contents_box: Box,
+    //contents_box: Box,
     //app_window: ApplicationWindow,
     window_title: WindowTitle,
     hb: HeaderBar,
@@ -143,7 +146,7 @@ impl WindowContentsState
 
                 //weak_self: NonOption::invalid_rfc(), //invalid_refcell(),
                 adapted_contents_box: WidgetAdapter::new(&contents_box, weak_self),
-                contents_box,
+                //contents_box,
                 //app_window: app_window.clone(),
                 window_title,
                 hb,
@@ -256,15 +259,64 @@ impl WindowContentsState
 
         //app_window.set_content(Some(&this.contents_box));
 
-        //Append a tab
+        //Append a default tab
 
-        let new_gql_ts = GraphQLTabState::new(&this.tv, &this.tokio_rt_handle);
+        //let new_gql_ts = GraphQLTabState::new(&this.tv, &this.tokio_rt_handle);
 
         //Center the main contents paned widget
 
         //https://gtk-rs.org/gtk4-rs/stable/latest/docs/gtk4/prelude/trait.WidgetExt.html#method.connect_parent_notify
 
-        new_gql_ts.set_contents_paned_position_halved(app_window.default_width());
+        //new_gql_ts.set_contents_paned_position_halved(app_window.default_width());
+
+        /*
+        this.adapted_contents_box.widget().connect_parent_notify(|this|
+        {
+
+            if let Some(parent) = this.parent()
+            {
+
+            }
+            
+
+        });
+        */
+
+        this.adapted_contents_box.widget().connect_parent_notify(clone!(@strong this => move |root|
+        {
+
+            //If the TabView has any pages do nothing.
+
+            if this.tv.n_pages() > 0
+            {
+
+                return;
+
+            }
+            
+            if let Some(parent) = root.parent()
+            {
+
+                //println!("Direct parent: {}", parent.type_().name()); //Direct parent: AdwBreakpointBin
+
+                //let bp_parent = parent.downcast_ref::<AdwBreakpointBin>().expect("Error: Must be an AdwBreakpointBin");
+
+                let pp_widget = parent.parent().expect("Error: AdwBreakpointBin - No Parent");
+
+                //println!("Next parent: {}", pp_widget.type_().name()); //Next parent: AdwApplicationWindow
+
+                let aw_parent = pp_widget.downcast_ref::<ApplicationWindow>().expect("Error: Must be an ApplicationWindow.");
+
+                let new_gql_ts = GraphQLTabState::new(&this);
+
+                //let sr = parent.size_request();
+
+                new_gql_ts.set_contents_paned_position_halved(aw_parent.default_width()); //sr.1); //.width_request()); //.allocated_width()); //.width());
+                
+            }
+            
+
+        }));
 
         //{
 
@@ -283,6 +335,20 @@ impl WindowContentsState
         //done!
 
         this
+
+    }
+
+    pub fn tab_view(&self) -> &TabView
+    {
+
+        &self.tv
+
+    }
+
+    pub fn tokio_rt_handle(&self) -> &Handle
+    {
+
+        &self.tokio_rt_handle
 
     }
 

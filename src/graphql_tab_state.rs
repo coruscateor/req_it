@@ -43,6 +43,7 @@ use tokio::runtime::Handle;
 use crate::actors::graphql_actor::{GraphQLRuntimeActor, GraphQLActorState};
 
 use crate::actors::graphql_actor_message::{GraphQLPostMessage, GraphQLRequestResult, GraphQLPostRequestParams};
+use crate::window_contents_state::WindowContentsState;
 
 //use act_rusty::ActorFrontend;
 
@@ -118,7 +119,7 @@ pub struct GraphQLTabState
 impl GraphQLTabState
 {
 
-    pub fn new(tv: &TabView, tokio_rt_handle_ref: &Handle) -> Rc<Self> //Rc<RefCell<Self>>
+    pub fn new(wcs: &Rc<WindowContentsState>) -> Rc<Self> //(tv: &TabView, tokio_rt_handle_ref: &Handle) -> Rc<Self> //Rc<RefCell<Self>>
     {
 
         //Setup GUI
@@ -397,7 +398,7 @@ impl GraphQLTabState
 
         //Init new tab page - this tab page
         
-        let tp = tv.append(&contents_box);
+        let tp = wcs.tab_view().append(&contents_box);
 
         tp.set_title("New Tab");
 
@@ -415,7 +416,7 @@ impl GraphQLTabState
 
         let actor_state = GraphQLActorState::new();
 
-        let graphql_post_actor = GraphQLRuntimeActor::new(tokio_rt_handle_ref, actor_state);
+        let graphql_post_actor = GraphQLRuntimeActor::new(wcs.tokio_rt_handle(), actor_state);//tokio_rt_handle_ref, actor_state);
   
         let this =  Rc::new_cyclic( move |weak_self|
         {
@@ -460,7 +461,7 @@ impl GraphQLTabState
                 query_paned,
                 results_paned,
                 graphql_post_actor,
-                tokio_rt_handle: tokio_rt_handle_ref.clone(),
+                tokio_rt_handle: wcs.tokio_rt_handle().clone(), //tokio_rt_handle_ref.clone(),
                 graphql_post_request_job: RefCell::new(None),
                 graphql_post_request_job_timeout: SimpleTimeOut::new(Duration::new(1, 0)) //TimeOut::new(Duration::new(1, 0), true)
 
