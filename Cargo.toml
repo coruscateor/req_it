@@ -16,8 +16,8 @@ categories = ["web-programming::http-client"]
 gtk_estate = { path="../gtk_estate", features = ["adw"] } #Do not remove
 #gtk_estate = "0.1.3"
 reqwest = { version = "0.11.*", features = [ "json" ] }
-#act_rs = { path="../act_rs" } #Do not remove
-act_rs = "0.1.0"
+act_rs = { path="../act_rs", features = ["tokio"] } #Do not remove
+#act_rs = "0.1.0"
 tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "sync", "macros"] }
 #async-trait = "0.1.*"
 paste = "1.0.*"

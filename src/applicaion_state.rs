@@ -4,27 +4,17 @@ use gtk_estate::corlib::impl_as_any;
 
 use gtk_estate::{gtk4 as gtk, AdwApplcationWindowState, ApplicationAdapter, ApplicationStateContainer, StateContainers, StoredApplicationObject};
 
-//use gtk_estate::*;
-
-//use gtk::Application;
-
 use gtk_estate::adw::Application;
 
 use std::{rc::*, any::Any};
 
 use std::cell::{RefCell, Ref, RefMut};
 
-//use corlib::rc_self_init_refcell_setup_returned_named;
-
-//use corlib::{NonOption, rc_self_setup}; //, rc_self_rfc_setup}; //rc_self_refcell_setup, //rc_self_init_refcell_setup_returned
-
 use gtk_estate::corlib::as_any::AsAny;
 
 use gtk::glib;
 
 use gtk::glib::clone;
-
-//use crate::window_state::*;
 
 use tokio::runtime::{Runtime, Handle, Builder};
 
@@ -34,9 +24,6 @@ pub struct ApplicationState
 {
 
     app: Application,
-    //weak_self: NonOption<Weak<RefCell<Self>>>,
-    //weak_self: RefCell<NonOption<Weak<Self>>>,
-    //weak_self: Weak<Self>,
     tokio_rt: Runtime,
     app_ad: Rc<ApplicationAdapter<Application, ApplicationState>>
 
@@ -57,7 +44,6 @@ impl ApplicationState
             {
 
                 app: app.clone(),
-                //weak_self: weak_self.clone(), //RefCell::new(NonOption::invalid()),
                 tokio_rt,
                 app_ad: ApplicationAdapter::new(app, weak_self)
 
@@ -65,68 +51,6 @@ impl ApplicationState
             }
 
         });
-
-        //let res = rc_self_init_refcell_setup_returned!(this, weak_self);
-        
-        //let rc_self = Rc::new(this); //Rc::new(RefCell::new(this));
-
-        //rc_self_refcell_setup!(rc_self, weak_self);
-
-        //rc_self_setup!(rc_self, weak_self);
-
-        //
-
-        /*
-        {
-
-            let b_self = rc_self.borrow();
-
-            /*
-            b_self.app.connect_startup(|_|
-            {
-    
-                if let Err(err) = adw::init()
-                {
-
-                    println!("Adwaita init errror: {}", err);
-
-                }
-    
-            });
-            */
-
-            b_self.app.connect_activate(move |app|
-            {
-
-                //new window
-
-                WindowState::new(app);
-
-            });
-
-        }
-        */
-
-        //let ws = this.weak_self.clone();
-
-        //let ws = &this.weak_self;
-        
-        /* 
-        this.app.connect_activate(clone!(@weak ws => move |_app|
-        {
-
-            if let Some(this) = ws.upgrade()
-            {
-
-                this.new_window();
-                
-            }*/
-
-            //Default window
-
-            //WindowState::new(app);
-
-        //}));
 
         let ws = this.app_ad.weak_parent();
 
@@ -140,27 +64,15 @@ impl ApplicationState
                 
             }
 
-            //Default window
-
-            //WindowState::new(app);
-
         });
 
         let sc = StateContainers::get();
 
         sc.set_application_state_or_panic(&this);
 
-        //sc.adw().borrow_mut_applications().add(&rc_self); //_refcell
-
-        //
-
         this
 
     }
-
-    //get weak self
-
-    //tokio_rt
 
     pub fn get_tokio_rt_handle_ref(&self) -> &Handle
     {
@@ -178,8 +90,6 @@ impl ApplicationState
 
     pub fn new_window(&self)
     {
-
-        //WindowState::new(&self.app);
 
         let content = WindowContentsState::new();
 
@@ -210,29 +120,3 @@ impl ApplicationStateContainer for ApplicationState
 
 }
 
-/*
-pub fn run()
-{
-
-    //let apst = ApplicattionState::new();
-
-    //apst.
-
-}
-*/
-
-//impl_has_application!(app, ApplicattionState);
-
-/*
-impl HasObject<Application> for ApplicattionState
-{
-
-    fn get_object(&self) -> &Application
-    {
-        
-        &self.app
-        
-    }
-
-}
-*/
