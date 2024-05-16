@@ -1,14 +1,6 @@
-//use act_rusty::{ActorFrontend, ActorState, HasInteractor, impl_mac_runtime_task_actor, DroppedIndicator, impl_default_on_enter_async, impl_default_on_exit_async, impl_default_on_enter_and_exit_async}; //impl_actor_frontend, //tokio_actors::RuntimeTaskFnActor,
+use act_rs::{ActorFrontend, ActorState, HasInteractor, impl_mac_runtime_task_actor, DroppedIndicator, impl_default_on_enter_async, impl_default_on_exit_async, impl_default_on_enter_and_exit_async};
 
-use act_rs::{ActorFrontend, ActorState, HasInteractor, impl_mac_runtime_task_actor, DroppedIndicator, impl_default_on_enter_async, impl_default_on_exit_async, impl_default_on_enter_and_exit_async}; //impl_actor_frontend, //tokio_actors::RuntimeTaskFnActor,
-
-//use act_rusty::tokio::{RuntimeTaskActor, interactors::mspc::{SenderInteractor, channel}};
-
-use act_rs::tokio::{RuntimeTaskActor, interactors::mspc::{SenderInteractor, channel}};
-
-//tokio_actors::RuntimeTaskActor,
-
-//tokio_interactors::mspc::{SenderInteractor, channel}, 
+use act_rs::tokio::{RuntimeTaskActor, interactors::mpsc::{SenderInteractor, channel}};
 
 use tokio::{sync::mpsc::Receiver, runtime::Handle};
 
@@ -18,11 +10,7 @@ use paste::paste;
 
 use std::{marker::PhantomData, sync::Arc};
 
-//use async_trait::async_trait;
-
 use tokio::runtime::Runtime;
-
-//use act_rusty::ActorInteractor;
 
 use act_rs::ActorInteractor;
 
@@ -69,6 +57,8 @@ impl GraphQLActorState
 
     }
 
+    //Default on_enter_async and on_exit_async implementations.
+
     impl_default_on_enter_and_exit_async!();
 
     async fn run_async(&mut self, di: &DroppedIndicator) -> bool
@@ -107,21 +97,6 @@ impl GraphQLActorState
 
                         //Body
 
-                        /*
-                        let mut json_body = HashMap::new();
-
-                        json_body.insert("query", params.query);
-
-                        if params.query_variables.len() > 0
-                        {
-
-                            json_body.insert("variables", params.query_variables);
-
-                        }
-                        */
-
-                        //let request_client = Client::new();
-
                         let mut json_body_map = Map::new();
 
                         json_body_map.insert("query".to_string(), Value::String(params.query));
@@ -129,16 +104,12 @@ impl GraphQLActorState
                         if params.query_variables.len() > 0
                         {
 
-                            //let variables_value;
-
-                            //let variables_value_res = serde_json::to_value(params.query_variables);
-
                             let variables_from_str = serde_json::from_str(params.query_variables.as_str());
                             
-                            match variables_from_str //variables_value_res
+                            match variables_from_str
                             {
                                 
-                                Ok(res) => //variables_value = res,
+                                Ok(res) =>
                                 {
 
                                     match &res
@@ -152,7 +123,7 @@ impl GraphQLActorState
 
                                             Self::check_send_error(sender.send(GraphQLRequestResult::new("Error: Parameters not provided in the format of an object".to_string(), Duration::default())));
 
-                                            return di.has_not_dropped();
+                                            return di.not_dropped();
 
                                         }
 
@@ -166,7 +137,7 @@ impl GraphQLActorState
 
                                     Self::check_send_error(sender.send(GraphQLRequestResult::new(err.to_string(), Duration::default())));
 
-                                    return di.has_not_dropped();
+                                    return di.not_dropped();
 
                                 }
 
@@ -176,9 +147,7 @@ impl GraphQLActorState
 
                         let json_body = Value::Object(json_body_map);
 
-                        let reqb = self.request_client.post(params.address).json(&json_body).headers(headers); //.body(params.query).header(key, value) //.data;
-
-                        //reqb.headers(headers);
+                        let reqb = self.request_client.post(params.address).json(&json_body).headers(headers);
 
                         let req_res = reqb.build();
 
@@ -193,7 +162,7 @@ impl GraphQLActorState
                                 
                                 Self::check_send_error(sender.send(GraphQLRequestResult::new(err.to_string(), Duration::default())));
 
-                                return di.has_not_dropped();
+                                return di.not_dropped();
 
                             }
                             
@@ -205,15 +174,11 @@ impl GraphQLActorState
 
                         //Send the request
 
-                        //let res = reqb.send().await;
-
-                        //Measure only the request and response
-
-                        //println!("{}", req);
+                        //Measuring only the request and response times.
 
                         let res = self.request_client.execute(req).await;
 
-                        //Get the elapsed time scince the start of sending the reqest to the reciipt of the response
+                        //Get the elapsed time since the start of sending the request to the receipt of the response.
 
                         let elapsed = req_start.elapsed();
 
@@ -261,13 +226,11 @@ impl GraphQLActorState
 
                                                 full_err_string.push_str(err_string.as_str());
 
-                                                Self::check_send_error(sender.send(GraphQLRequestResult::new(full_err_string, elapsed))) //err.to_string(), elapsed)))
+                                                Self::check_send_error(sender.send(GraphQLRequestResult::new(full_err_string, elapsed)))
 
                                             }
 
-                                        }
-
-                                        //Self::check_send_error(sender.send(GraphQLRequestResult::new(text_ok_res, elapsed)));                                        
+                                        }                                        
 
                                     },
                                     Err(text_err_res) =>
@@ -286,13 +249,7 @@ impl GraphQLActorState
 
                             }
 
-                        } 
-
-                        //res.
-
-                        //let send_res = sender.send(GraphQLRequestResult::new("Success!".into(), 1.0));
-
-                        //Self::check_send_error(sender.send(GraphQLRequestResult::new("Success!".into(), elapsed)));
+                        }
 
                     },
 
@@ -302,9 +259,7 @@ impl GraphQLActorState
 
         }
 
-        //true
-
-        di.has_not_dropped()
+        di.not_dropped()
 
     }
 
@@ -315,8 +270,6 @@ impl GraphQLActorState
         {
 
             println!("GraphQLMessage Send Error");
-            
-            //err.
 
         }
 
@@ -327,139 +280,15 @@ impl GraphQLActorState
 impl HasInteractor<SenderInteractor<Option<GraphQLPostMessage>>> for GraphQLActorState
 {
 
-    fn get_interactor(&self) -> SenderInteractor<Option<GraphQLPostMessage>>
+    fn interactor(&self) -> &SenderInteractor<Option<GraphQLPostMessage>>
     {
        
-       self.sender.clone()
+       &self.sender
 
     }
 
 }
 
-//impl_mac_runtime_task_actor!(SenderInteractor<Option<GraphQLPostMessage>>, GraphQLActorState, SenderInteractor_GraphQLActorState);
+//Setup the macro generated runtime task actor.  
 
-//pub type GraphQLRuntimeActor = MacRuntimeTaskActor_SenderInteractor_GraphQLActorState;
-
-impl_mac_runtime_task_actor!(SenderInteractor<Option<GraphQLPostMessage>>, GraphQLActorState, GraphQLRuntimeActor);
-
-/*
-async fn default_fn_enter(_state: &mut GraphQLActorState, _di: &DroppedIndicator) -> bool
-{
-
-    true
-
-}
-
-async fn default_fn_exit(_state: &mut GraphQLActorState, _di: &DroppedIndicator)
-{
-}
-
-async fn run(state: &mut GraphQLActorState, di: &DroppedIndicator) -> bool
-{
-
-    true
-
-}
-*/
-
-/*
-pub fn get_runtime_task_actor(handle: &Handle) -> GraphQLRuntimeActor
-{
-
-    let state = GraphQLActorState::new();
-
-    GraphQLRuntimeActor::new(handle, state)
-
-    /*
-
-    Some value of type T.
-
-    higher-ranked lifetime error
-    could not prove `RuntimeTaskFnActor<GraphQLActorState, SenderInteractor<std::option::Option<graphql_actor_message::GraphQLMessage>>, impl Future<Output = bool>, for<'a, 'b> fn(&'a mut GraphQLActorState, &'b DroppedIndicator) -> impl Future<Output = bool> {default_fn_enter}, impl Future<Output = bool>, for<'a, 'b> fn(&'a mut GraphQLActorState, &'b DroppedIndicator) -> impl Future<Output = bool> {graphql_actor::run}, impl Future<Output = ()>, for<'a, 'b> fn(&'a mut GraphQLActorState, &'b DroppedIndicator) -> impl Future<Output = ()> {default_fn_exit}> well-formed`rustcClick for full compiler diagnostic
-
-     */
-
-    //let actor = RuntimeTaskFnActor::new(handle, state, default_fn_enter, run, default_fn_exit); //None, run, None);
-
-    /*
-
-    type annotations needed for `RuntimeTaskFnActor<GraphQLActorState, SenderInteractor<std::option::Option<graphql_actor_message::GraphQLMessage>>, FB, FNB, impl Future<Output = bool>, [closure@src/actors/graphql_actor.rs:54:62: 54:127], FE, FNE>`
-    cannot satisfy `<_ as Future>::Output == bool`rustcClick for full compiler diagnostic
-    graphql_actor.rs(54, 17): type must be known at this point
-    runtime_task_fn_actor.rs(40, 16): required by a bound in `RuntimeTaskFnActor::<ST, IN, FB, FNB, FR, FNR, FE, FNE>::new`
-    graphql_actor.rs(54, 14): consider giving `actor` an explicit type, where the type for type parameter `FB` is specified: `: RuntimeTaskFnActor<GraphQLActorState, SenderInteractor<std::option::Option<graphql_actor_message::GraphQLMessage>>, FB, FNB, impl Future<Output = bool>, [closure@src/actors/graphql_actor.rs:54:62: 54:127], FE, FNE>`
-
-    */
-
-    /*
-    let actor = RuntimeTaskFnActor::new(handle, state, None, async move |state: &mut GraphQLActorState, di: &DroppedIndicator| {
-
-        true
-
-    }, None);
-    */
-
-}
-*/
-
-/*
-error[E0195]: lifetime parameters or bounds on method `on_enter` do not match the trait declaration
-  --> src/actors/graphql_actor.rs:48:14
-   |
-48 |     async fn on_enter(&mut self, _di: &act_rusty::DroppedIndicator) -> bool 
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lifetimes do not match method in trait
-
-error[E0195]: lifetime parameters or bounds on method `run` do not match the trait declaration
-  --> src/actors/graphql_actor.rs:55:14
-   |
-55 |     async fn run(&mut self, di: &act_rusty::DroppedIndicator) -> bool
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lifetimes do not match method in trait
-
-error[E0195]: lifetime parameters or bounds on method `on_exit` do not match the trait declaration
-  --> src/actors/graphql_actor.rs:69:14
-   |
-69 |     async fn on_exit(&mut self, _di: &act_rusty::DroppedIndicator)
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lifetimes do not match method in trait
- */
-
-/*
-#[async_trait]
-impl ActorState<SenderInteractor<Option<GraphQLMessage>>> for GraphQLActorState
-{
-
-    /*
-    fn get_interactor(&self) -> SenderInteractor<Option<GraphQLMessage>>
-    {
-       
-       self.sender.clone()
-
-    }
-    */
-
-    //async fn on_enter(&mut self, _di: &act_rusty::DroppedIndicator) -> bool 
-    //{
-        
-    //    true //proceed
-
-    //}
-
-    async fn run(&mut self, di: &act_rusty::DroppedIndicator) -> bool
-    {
-
-        if let Some(val) = self.reciver.recv().await
-        {
-
-
-
-        }
-       
-        di.has_not_dropped()
-
-    }
-
-    //async fn on_exit(&mut self, _di: &act_rusty::DroppedIndicator)
-    //{
-    //}
-
-}
-*/
+impl_mac_runtime_task_actor!(GraphQLActorState, SenderInteractor<Option<GraphQLPostMessage>>, GraphQLRuntimeActor);
