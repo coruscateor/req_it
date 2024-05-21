@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 
 use std::rc::{Weak, Rc};
 
@@ -16,7 +16,13 @@ use gtk_estate::gtk4::{self as gtk, Box, Orientation, TextView, Paned, Notebook,
 
 use gtk_estate::adw::{TabBar, TabPage, TabView};
 
-use gtk_estate::corlib::{impl_as_any, rc_self_setup, AsAny};
+//use gtk_estate::corlib::{impl_as_any, rc_self_setup, AsAny};
+
+//use corlib::{impl_as_any, AsAny, rfc_borrow, rfc_borrow_mut};
+
+use gtk_estate::corlib::{impl_as_any, AsAny};
+
+use corlib::rfc_borrow_mut; //rfc_borrow,
 
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
@@ -51,6 +57,30 @@ use gtk::glib;
 use gtk::glib::clone;
 
 type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
+
+struct MutState
+{
+
+    pub graphql_post_request_job: Option<Receiver<GraphQLRequestResult>>
+
+}
+
+impl MutState
+{
+
+    pub fn new() -> Self
+    {
+
+        Self
+        {
+
+            graphql_post_request_job: None
+
+        }
+
+    }
+
+}
 
 pub struct GraphQLTabState
 {
@@ -90,8 +120,9 @@ pub struct GraphQLTabState
     results_paned: Paned,
     graphql_post_actor: GraphQLRuntimeActor,
     tokio_rt_handle: Handle,
-    graphql_post_request_job: RefCell<Option<Receiver<GraphQLRequestResult>>>,
-    graphql_post_request_job_timeout: RcSimpleTimeOut
+    //graphql_post_request_job: RefCell<Option<Receiver<GraphQLRequestResult>>>,
+    graphql_post_request_job_timeout: RcSimpleTimeOut,
+    mut_state: RefCell<MutState>
 
 }
 
@@ -317,8 +348,9 @@ impl GraphQLTabState
                 results_paned,
                 graphql_post_actor,
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
-                graphql_post_request_job: RefCell::new(None),
-                graphql_post_request_job_timeout: SimpleTimeOut::new(Duration::new(1, 0))
+                //graphql_post_request_job: RefCell::new(None),
+                graphql_post_request_job_timeout: SimpleTimeOut::new(Duration::new(1, 0)),
+                mut_state: RefCell::new(MutState::new())
 
             }
 
@@ -338,6 +370,67 @@ impl GraphQLTabState
 
         let weak_self_mv = weak_self.clone();
 
+        this.run_button.connect_clicked(move |_btn|
+        {
+
+            if let Some(this) = weak_self_mv.upgrade()
+            {
+
+                rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
+                {
+
+   
+                    //Return if the job is already active
+    
+                    if mut_state.graphql_post_request_job.is_some()
+                    {
+    
+                        return;
+    
+                    }
+    
+                    //Request
+    
+                    let address = this.address_text.text().to_string();
+    
+                    let query = get_text_view_string(&this.query_text);
+    
+                    let query_variables = get_text_view_string(&this.query_variables);
+    
+                    let http_headers = get_text_view_string(&this.http_headers);
+    
+                    let message_params = GraphQLPostRequestParams::new(address, query, query_variables, http_headers);
+    
+                    let (sender, reciver) = channel();
+    
+                    let request_message = GraphQLPostMessage::Request(message_params, sender);
+    
+                    let interactor = this.graphql_post_actor.interactor();
+    
+                    let send_res = interactor.sender().blocking_send(Some(request_message));
+                    
+                    if let Err(err) = send_res
+                    {
+    
+                        this.results_text.buffer().set_text(err.to_string().as_str());
+    
+                    }
+                    else
+                    {
+                        
+                        mut_state.graphql_post_request_job = Some(reciver);
+    
+                        this.graphql_post_request_job_timeout.start();
+    
+                    }
+
+                });
+
+            }
+            
+        });
+
+        /*
         this.run_button.connect_clicked(move |_btn|
         {
 
@@ -391,9 +484,89 @@ impl GraphQLTabState
             }
 
         });
+        */
 
         //TimeOut
 
+        this.graphql_post_request_job_timeout.set_function(move |_sto|
+        {
+
+            if let Some(this) = weak_self.upgrade()
+            {
+
+                return rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>| {
+
+                    //let mut graphql_post_request_job_mut = this.graphql_post_request_job.borrow_mut();
+
+                    if let Some(rec) = mut_state.graphql_post_request_job.as_mut()
+                    {
+
+                        match rec.try_recv()
+                        {
+
+                            Ok(res) => 
+                            {
+
+                                //Job complete - set the result
+
+                                let mut duration_millis = res.get_duration().as_millis().to_string();
+
+                                duration_millis.push_str(" ms");
+
+                                this.time_output_label.set_text(duration_millis.as_str());
+
+                                this.results_text.buffer().set_text(res.get_result_ref().as_str());
+
+                            },
+                            Err(err) =>
+                            {
+
+                                if let OneshotTryRecvError::Closed = err
+                                {
+
+                                    //Error detected - Set the error
+
+                                    this.time_output_label.set_text("N/A");
+
+                                    this.results_text.buffer().set_text(err.to_string().as_str());
+
+                                    //Make sure the job has been dropped
+
+                                    mut_state.graphql_post_request_job = None;
+
+                                    //Stop the reoccurring Timeout
+
+                                    return false;
+
+                                }
+
+                                //The Recevier is empty, try again soon.
+
+                                return true;
+
+                            }
+
+                        }
+
+                    }
+
+                    //Drop the job if it's done. 
+
+                    mut_state.graphql_post_request_job = None;
+
+                    false
+
+                });
+
+            }
+
+            //Stop the Timeout as weak_self is not upgradeable.
+
+            false
+
+        });
+
+        /*
         this.graphql_post_request_job_timeout.set_function(move |_sto| {
 
             if let Some(this) = weak_self.upgrade()
@@ -468,6 +641,7 @@ impl GraphQLTabState
             false
 
         });
+        */
 
         this
 
@@ -485,6 +659,20 @@ impl GraphQLTabState
 }
 
 impl_as_any!(GraphQLTabState);
+
+/*
+impl AsAny for GraphQLTabState
+{
+
+    fn as_any(&self) -> &dyn Any
+    {
+
+        self
+        
+    }
+
+}
+*/
 
 impl WidgetStateContainer for GraphQLTabState
 {
