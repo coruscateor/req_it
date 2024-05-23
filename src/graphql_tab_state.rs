@@ -494,7 +494,8 @@ impl GraphQLTabState
             if let Some(this) = weak_self.upgrade()
             {
 
-                return rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>| {
+                return rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
+                {
 
                     //let mut graphql_post_request_job_mut = this.graphql_post_request_job.borrow_mut();
 
@@ -516,6 +517,12 @@ impl GraphQLTabState
                                 this.time_output_label.set_text(duration_millis.as_str());
 
                                 this.results_text.buffer().set_text(res.get_result_ref().as_str());
+
+                                //Job complete, drop the job and stop the Timeout.
+
+                                mut_state.graphql_post_request_job = None;
+
+                                return false;
 
                             },
                             Err(err) =>
@@ -552,12 +559,16 @@ impl GraphQLTabState
 
                     //Drop the job if it's done. 
 
-                    mut_state.graphql_post_request_job = None;
+                    //mut_state.graphql_post_request_job = None;
+
+                    //graphql_post_request_job has a None value.
+
+                    //Stop the Timeout
 
                     false
 
                 });
-
+                
             }
 
             //Stop the Timeout as weak_self is not upgradeable.
