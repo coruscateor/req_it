@@ -24,6 +24,10 @@ use gtk_estate::corlib::{impl_as_any, AsAny};
 
 use corlib::rfc_borrow_mut; //rfc_borrow,
 
+use corlib::upgrading::up_rc;
+
+use corlib::rfc::{borrow_mut, borrow_mut_2};
+
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
 use tokio::runtime::Handle;
@@ -121,7 +125,7 @@ pub struct GraphQLTabState
     graphql_post_actor: GraphQLRuntimeActor,
     tokio_rt_handle: Handle,
     //graphql_post_request_job: RefCell<Option<Receiver<GraphQLRequestResult>>>,
-    graphql_post_request_job_timeout: RcSimpleTimeOut,
+    graphql_post_request_job_timeout: RcSimpleTimeOut<Weak<GraphQLTabState>>,
     mut_state: RefCell<MutState>
 
 }
@@ -349,7 +353,7 @@ impl GraphQLTabState
                 graphql_post_actor,
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
                 //graphql_post_request_job: RefCell::new(None),
-                graphql_post_request_job_timeout: SimpleTimeOut::new(Duration::new(1, 0)),
+                graphql_post_request_job_timeout: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
                 mut_state: RefCell::new(MutState::new())
 
             }
@@ -373,10 +377,12 @@ impl GraphQLTabState
         this.run_button.connect_clicked(move |_btn|
         {
 
-            if let Some(this) = weak_self_mv.upgrade()
+            //if let Some(this) = weak_self_mv.upgrade()
+            up_rc(&weak_self_mv, |this|
             {
 
-                rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
+                //rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
+                borrow_mut(&this.mut_state, &this, |mut mut_state, this|
                 {
 
    
@@ -426,7 +432,7 @@ impl GraphQLTabState
 
                 });
 
-            }
+            });
             
         });
 
@@ -510,13 +516,13 @@ impl GraphQLTabState
 
                                 //Job complete - set the result
 
-                                let mut duration_millis = res.get_duration().as_millis().to_string();
+                                let mut duration_millis = res.duration().as_millis().to_string(); //.get_duration().as_millis().to_string();
 
                                 duration_millis.push_str(" ms");
 
                                 this.time_output_label.set_text(duration_millis.as_str());
 
-                                this.results_text.buffer().set_text(res.get_result_ref().as_str());
+                                this.results_text.buffer().set_text(res.result().as_str()); //.get_result_ref().as_str());
 
                                 //Job complete, drop the job and stop the Timeout.
 
