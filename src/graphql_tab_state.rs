@@ -8,6 +8,7 @@ use std::sync::mpsc::TryRecvError;
 
 use std::time::Duration;
 
+use gtk_estate::adw::glib::clone::Upgrade;
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
 
 use gtk_estate::{helpers::*, RcSimpleTimeOut, SimpleTimeOut, StateContainers, StoredWidgetObject, WidgetAdapter, WidgetStateContainer};
@@ -372,13 +373,13 @@ impl GraphQLTabState
 
         let weak_self = this.adapted_contents_box.weak_parent();
 
-        let weak_self_mv = weak_self.clone();
+        //let weak_self_mv = weak_self.clone();
 
         this.run_button.connect_clicked(move |_btn|
         {
 
             //if let Some(this) = weak_self_mv.upgrade()
-            up_rc(&weak_self_mv, |this|
+            up_rc(&weak_self, |this| //weak_self_mv
             {
 
                 //rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
@@ -494,13 +495,14 @@ impl GraphQLTabState
 
         //TimeOut
 
-        this.graphql_post_request_job_timeout.set_function(move |_sto|
+        this.graphql_post_request_job_timeout.set_on_time_out_fn(move |sto|
         {
 
-            if let Some(this) = weak_self.upgrade()
+            if let Some(this) = sto.state().upgrade() //weak_self.upgrade()
             {
 
-                return rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
+                //return rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
+                return borrow_mut(&this.mut_state, &this, | mut mut_state, this|
                 {
 
                     //let mut graphql_post_request_job_mut = this.graphql_post_request_job.borrow_mut();
@@ -553,7 +555,7 @@ impl GraphQLTabState
 
                                 }
 
-                                //The Recevier is empty, try again soon.
+                                //The receiver is empty, try again soon.
 
                                 return true;
 

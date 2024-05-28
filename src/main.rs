@@ -17,7 +17,7 @@ fn main()
     
     //Initaslise the StateContainers object.
 
-    StateContainers::init();
+    //StateContainers::init();
 
     ApplicationState::new(&app);
 
