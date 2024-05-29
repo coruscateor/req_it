@@ -39,6 +39,8 @@ use crate::applicaion_state::ApplicationState;
 
 use std::any::Any;
 
+use gtk_estate::helpers::widget_ext::find_parent;
+
 pub struct WindowContentsState
 {
 
@@ -144,6 +146,7 @@ impl WindowContentsState
             //if let Some(parent) = root.parent()
             //{
 
+            /*
             let parent = root.parent().expect("Must have parent!");
 
             //Comments kept for "parental debugging".
@@ -167,6 +170,9 @@ impl WindowContentsState
             println!("This parent 3: {}", pp3_widget.type_().name()); 
 
             let aw_parent = pp3_widget.downcast_ref::<ApplicationWindow>().expect("Error: Must be an ApplicationWindow.");
+            */
+
+            let aw_parent = find_parent::<ApplicationWindow, _>(root);
 
             let new_gql_ts = GraphQLTabState::new(&this);
 
@@ -175,7 +181,8 @@ impl WindowContentsState
             new_gql_ts.set_contents_paned_position_halved(aw_parent.default_width());
                 
             //}
-            
+        
+
 
         }));
 
