@@ -23,9 +23,9 @@ use gtk_estate::gtk4::{self as gtk, Box, Orientation, Label, BaselinePosition, A
 
 use gtk_estate::adw::{Application, ApplicationWindow, HeaderBar, WindowTitle, prelude::AdwApplicationWindowExt, gtk::prelude::ApplicationWindowExt, gtk::prelude::GtkWindowExt};
 
-use gtk_estate::corlib::{impl_as_any, rc_self_setup, NonOption, as_any::AsAny};
+use gtk_estate::corlib::{impl_as_any, as_any::AsAny};
 
-use gtk_estate::time_out::*;
+//use gtk_estate::{RcTimeOut, TimeOut}; //time_out::*;
 
 use gtk_estate::adw::{TabBar, TabPage, TabView};
 
@@ -172,7 +172,7 @@ impl WindowContentsState
             let aw_parent = pp3_widget.downcast_ref::<ApplicationWindow>().expect("Error: Must be an ApplicationWindow.");
             */
 
-            let aw_parent = find_parent::<ApplicationWindow, _>(root);
+            let aw_parent = find_parent::<ApplicationWindow>(root); //find_parent::<ApplicationWindow, _>(root);
 
             let new_gql_ts = GraphQLTabState::new(&this);
 

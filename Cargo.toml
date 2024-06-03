@@ -13,8 +13,8 @@ categories = ["web-programming::http-client"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gtk_estate = { path="../gtk_estate", features = ["adw"] } #Do not remove
-#gtk_estate = "0.1.3"
+#gtk_estate = { path="../gtk_estate", features = ["adw"] } #Do not remove
+gtk_estate = { version = "0.3.0", features = ["adw"] }
 reqwest = { version = "0.11.*", features = [ "json" ] }
 act_rs = { path="../act_rs", features = ["tokio"] } #Do not remove
 #act_rs = "0.1.0"
@@ -26,4 +26,3 @@ corlib = { path="../corlib" }
 #pretty_goodness = { path="../pretty_goodness" } #Do not remove
 pretty_goodness = "0.1.0"
 serde_json = "1.0.95"
-
