@@ -26,7 +26,7 @@ use pretty_goodness::json::PrettyEr;
 
 use serde_json::{Value, Map};
 
-pub struct GraphQLActorState
+pub struct WebSocketActorState
 {
 
     sender: SenderInteractor<Option<GraphQLPostMessage>>,
@@ -36,7 +36,7 @@ pub struct GraphQLActorState
 
 }
 
-impl GraphQLActorState
+impl WebSocketActorState
 {
 
     pub fn new() -> Self
@@ -279,7 +279,7 @@ impl GraphQLActorState
 
 }
 
-impl HasInteractor<SenderInteractor<Option<GraphQLPostMessage>>> for GraphQLActorState
+impl HasInteractor<SenderInteractor<Option<GraphQLPostMessage>>> for WebSocketActorState
 {
 
     fn interactor(&self) -> &SenderInteractor<Option<GraphQLPostMessage>>
@@ -291,8 +291,6 @@ impl HasInteractor<SenderInteractor<Option<GraphQLPostMessage>>> for GraphQLActo
 
 }
 
-//Setup the macro generated runtime task actor.  
+//Setup the macro generated task actor.
 
-//impl_mac_runtime_task_actor!(GraphQLActorState, SenderInteractor<Option<GraphQLPostMessage>>, GraphQLRuntimeActor);
-
-impl_mac_task_actor!(GraphQLActorState, SenderInteractor<Option<GraphQLPostMessage>>, GraphQLActor);
+impl_mac_task_actor!(WebSocketActorState, SenderInteractor<Option<GraphQLPostMessage>>, WebSocketActor);

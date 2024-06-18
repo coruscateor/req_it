@@ -9,6 +9,7 @@ use std::sync::mpsc::TryRecvError;
 use std::time::Duration;
 
 use gtk_estate::adw::glib::clone::Upgrade;
+use gtk_estate::gtk4::ListBox;
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
 
 use gtk_estate::{helpers::*, RcSimpleTimeOut, SimpleTimeOut, StateContainers, StoredWidgetObject, WidgetAdapter, WidgetStateContainer};
@@ -45,7 +46,7 @@ use tokio::runtime::Handle;
 
 //https://web.archive.org/web/20221126181112/https://world.pages.gitlab.gnome.org/Rust/libadwaita-rs/stable/latest/docs/libadwaita/index.html
 
-use crate::actors::graphql_actor::{GraphQLActor, GraphQLActorState};
+use crate::actors::{WebSocketActor, WebSocketActorState};
 
 //GraphQLRuntimeActor,
 
@@ -89,51 +90,53 @@ impl MutState
 
 }
 
-pub struct GraphQLTabState
+pub struct WebSocketTabState
 {
 
-    adapted_contents_box: Rc<WidgetAdapter<Box, GraphQLTabState>>,
+    adapted_contents_box: Rc<WidgetAdapter<Box, WebSocketTabState>>,
     tp: TabPage,
 
     //Header
 
     address_text: Text,
-    run_button: Button,
+    connect_button: Button,
     time_output_label: Label,
 
     //Tabpage
 
     //Top Left
 
-    query_text: TextView,
+    to_be_sent_text: TextView,
 
     //Bottom Left - tabs
 
-    query_variables: TextView,
-    http_headers: TextView,
+    //query_variables: TextView,
+    //http_headers: TextView,
 
     //Top Right
 
-    results_text: TextView,
+    //received_text: TextView,
+
+    received_messages: ListBox,
 
     //Bottom Right
 
-    tracing_text: TextView,
+    //tracing_text: TextView,
 
     //
 
     contents_paned: Paned,
-    query_paned: Paned,
-    results_paned: Paned,
-    graphql_post_actor: GraphQLActor, //GraphQLRuntimeActor,
+    to_be_sent_paned: Paned,
+    received_paned: Paned,
+    web_socket_actor: WebSocketActor,
     tokio_rt_handle: Handle,
-    //graphql_post_request_job: RefCell<Option<Receiver<GraphQLRequestResult>>>,
-    graphql_post_request_job_timeout: RcSimpleTimeOut<Weak<GraphQLTabState>>,
+
+    graphql_post_request_job_timeout: RcSimpleTimeOut<Weak<WebSocketTabState>>,
     mut_state: RefCell<MutState>
 
 }
 
-impl GraphQLTabState
+impl WebSocketTabState
 {
 
     pub fn new(wcs: &Rc<WindowContentsState>) -> Rc<Self>
@@ -143,7 +146,7 @@ impl GraphQLTabState
 
         let contents_box = Box::new(Orientation::Vertical, 0);
 
-        //Contains the query and results Paned widgets
+        //Contains the query and received Paned widgets
 
         let header_box = Box::new(Orientation::Vertical, 2);
 
@@ -159,7 +162,7 @@ impl GraphQLTabState
 
         address_text.set_hexpand(true);
 
-        address_text.buffer().set_text("http://localhost:8000");
+        address_text.buffer().set_text("http://localhost:3000");
 
         address_box.append(&address_text);
 
@@ -176,9 +179,9 @@ impl GraphQLTabState
         
         let tool_center_box = Box::new(Orientation::Horizontal, 2);
 
-        let run_button = Button::builder().label("Run").build();
+        let connect_button = Button::builder().label("Connect").build();
 
-        tool_center_box.append(&run_button);
+        tool_center_box.append(&connect_button);
 
         tool_cbox.set_center_widget(Some(&tool_center_box));
 
@@ -212,17 +215,17 @@ impl GraphQLTabState
 
         //Left Side
 
-        let query_paned = Paned::new(Orientation::Vertical);
+        let to_be_sent_paned = Paned::new(Orientation::Vertical);
 
-        contents_paned.set_start_child(Some(&query_paned));
+        contents_paned.set_start_child(Some(&to_be_sent_paned));
 
         //Right Side
 
-        let results_paned = Paned::new(Orientation::Vertical);
+        let received_paned = Paned::new(Orientation::Vertical);
 
         
 
-        contents_paned.set_end_child(Some(&results_paned));
+        contents_paned.set_end_child(Some(&received_paned));
 
         //query_paned children
 
@@ -230,21 +233,22 @@ impl GraphQLTabState
 
         //Top Left
 
-        let query_text = TextView::new();
+        let to_be_sent_text = TextView::new();
 
-        let query_text_scrolledwindow = ScrolledWindow::builder().child(&query_text).build();
+        let to_be_sent_text_scrolledwindow = ScrolledWindow::builder().child(&to_be_sent_text).build();
 
-        set_hvexpand_t(&query_text_scrolledwindow);
+        set_hvexpand_t(&to_be_sent_text_scrolledwindow);
 
-        query_paned.set_start_child(Some(&query_text_scrolledwindow));
+        to_be_sent_paned.set_start_child(Some(&to_be_sent_text_scrolledwindow));
 
         //end child
 
         //Lower left pane
 
+        /*
         let parameters_nb = Notebook::new();
 
-        query_paned.set_end_child(Some(&parameters_nb));
+        to_be_sent_paned.set_end_child(Some(&parameters_nb));
 
         let query_variables = TextView::new();
 
@@ -271,38 +275,43 @@ impl GraphQLTabState
         set_hvexpand_t(&http_headers_scrolledwindow);
 
         parameters_nb.append_page(&http_headers_scrolledwindow, Some(&http_headers_label));
+        */
 
-        //results_paned
+        //received_paned
 
         //Start Child - Upper right
 
-        //Query Results - Upper right
+        //Received - Upper right
 
-        let results_text = TextView::new();
+        //let received_text = TextView::new();
 
-        let results_text_scrolledwindow = ScrolledWindow::builder().child(&results_text).build();
+        let received_messages = ListBox::new();
 
-        set_hvexpand_t(&results_text_scrolledwindow);
+        let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_messages).build();
 
-        results_text.buffer().set_text("results_text");
+        set_hvexpand_t(&recived_messages_scrolled_window);
 
-        results_paned.set_start_child(Some(&results_text_scrolledwindow));
+        //received_messages.buffer().set_text("received_text");
+
+        received_paned.set_start_child(Some(&recived_messages_scrolled_window));
 
         //End Child - Lower right
 
+        /*
         let tracing_text = TextView::new();
 
         let tracing_text_scrolledwindow = ScrolledWindow::builder().child(&tracing_text).build();
 
         set_hvexpand_t(&tracing_text_scrolledwindow);
 
-        results_paned.set_end_child(Some(&tracing_text_scrolledwindow));
+        received_paned.set_end_child(Some(&tracing_text_scrolledwindow));
+        */
 
         //Init new tab page - this tab page
         
         let tp = wcs.tab_view().append(&contents_box);
 
-        tp.set_title("New Tab");
+        tp.set_title("Websocket Tab");
 
         //
 
@@ -310,9 +319,9 @@ impl GraphQLTabState
 
         //Initialise reference type instance
 
-        let actor_state = GraphQLActorState::new();
+        let actor_state = WebSocketActorState::new();
 
-        let graphql_post_actor; //= GraphQLActor::new(actor_state); //GraphQLRuntimeActor::new(wcs.tokio_rt_handle(), actor_state);
+        let web_socket_actor; //= GraphQLActor::new(actor_state); //GraphQLRuntimeActor::new(wcs.tokio_rt_handle(), actor_state);
   
         //Try entering the runtime here instead of using a runtime actor. 
 
@@ -320,7 +329,7 @@ impl GraphQLTabState
 
             let _entered_rt = wcs.tokio_rt_handle().enter();
 
-            graphql_post_actor = GraphQLActor::new(actor_state);
+            web_socket_actor = WebSocketActor::new(actor_state);
 
         }
 
@@ -336,36 +345,36 @@ impl GraphQLTabState
                 //Header
 
                 address_text,
-                run_button,
+                connect_button,
                 time_output_label,
 
                 //Tabpage
 
                 //Top Left
 
-                query_text,
+                to_be_sent_text,
 
                 //Bottom Left - tabs
 
-                query_variables,
-                http_headers,
+                //query_variables,
+                //http_headers,
 
                 //Top Right
 
-                results_text,
+                //received_text,
 
                 //Bottom Right
 
-                tracing_text,
+                //tracing_text,
+                received_messages,
 
                 //
                 
                 contents_paned,
-                query_paned,
-                results_paned,
-                graphql_post_actor,
+                to_be_sent_paned,
+                received_paned,
+                web_socket_actor,
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
-                //graphql_post_request_job: RefCell::new(None),
                 graphql_post_request_job_timeout: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
                 mut_state: RefCell::new(MutState::new())
 
@@ -381,20 +390,16 @@ impl GraphQLTabState
 
         scs.add(&this);
 
-        //Run Button
+        //Connect Button
 
         let weak_self = this.adapted_contents_box.weak_parent();
 
-        //let weak_self_mv = weak_self.clone();
-
-        this.run_button.connect_clicked(move |_btn|
+        this.connect_button.connect_clicked(move |_btn|
         {
 
-            //if let Some(this) = weak_self_mv.upgrade()
-            up_rc(&weak_self, |this| //weak_self_mv
+            up_rc(&weak_self, |this|
             {
 
-                //rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
                 borrow_mut(&this.mut_state, &this, |mut mut_state, this|
                 {
 
@@ -412,26 +417,28 @@ impl GraphQLTabState
     
                     let address = this.address_text.text().to_string();
     
-                    let query = get_text_view_string(&this.query_text);
+                    let query = get_text_view_string(&this.to_be_sent_text);
     
-                    let query_variables = get_text_view_string(&this.query_variables);
+                    //let query_variables = get_text_view_string(&this.query_variables);
     
-                    let http_headers = get_text_view_string(&this.http_headers);
+                    //let http_headers = get_text_view_string(&this.http_headers);
+
+                    let es = "".to_string();
     
-                    let message_params = GraphQLPostRequestParams::new(address, query, query_variables, http_headers);
+                    let message_params = GraphQLPostRequestParams::new(address, query, es.clone(), es); //query_variables, http_headers);
     
                     let (sender, reciver) = channel();
     
                     let request_message = GraphQLPostMessage::Request(message_params, sender);
     
-                    let interactor = this.graphql_post_actor.interactor();
+                    let interactor = this.web_socket_actor.interactor();
     
                     let send_res = interactor.sender().blocking_send(Some(request_message));
                     
                     if let Err(err) = send_res
                     {
     
-                        this.results_text.buffer().set_text(err.to_string().as_str());
+                        //this.received_text.buffer().set_text(err.to_string().as_str());
     
                     }
                     else
@@ -449,75 +456,16 @@ impl GraphQLTabState
             
         });
 
-        /*
-        this.run_button.connect_clicked(move |_btn|
-        {
-
-            if let Some(this) = weak_self_mv.upgrade()
-            {
-
-                //Return if the job is already active
-
-                if this.graphql_post_request_job.borrow().is_some()
-                {
-
-                    return;
-
-                }
-
-                //Request
-
-                let address = this.address_text.text().to_string();
-
-                let query = get_text_view_string(&this.query_text);
-
-                let query_variables = get_text_view_string(&this.query_variables);
-
-                let http_headers = get_text_view_string(&this.http_headers);
-
-                let message_params = GraphQLPostRequestParams::new(address, query, query_variables, http_headers);
-
-                let (sender, reciver) = channel();
-
-                let request_message = GraphQLPostMessage::Request(message_params, sender);
-
-                let interactor = this.graphql_post_actor.interactor();
-
-                let send_res = interactor.sender().blocking_send(Some(request_message));
-                
-                if let Err(err) = send_res
-                {
-
-                    this.results_text.buffer().set_text(err.to_string().as_str());
-
-                }
-                else
-                {
-                    
-                    *this.graphql_post_request_job.borrow_mut() = Some(reciver);
-
-                    this.graphql_post_request_job_timeout.start();
-
-                }
-
-            }
-
-        });
-        */
-
         //TimeOut
 
         this.graphql_post_request_job_timeout.set_on_time_out_fn(move |sto|
         {
 
-            if let Some(this) = sto.state().upgrade() //weak_self.upgrade()
+            if let Some(this) = sto.state().upgrade()
             {
 
-                //return rfc_borrow_mut!(this, |mut mut_state: RefMut<MutState>, this: &Rc<GraphQLTabState>|
                 return borrow_mut(&this.mut_state, &this, | mut mut_state, this|
                 {
-
-                    //let mut graphql_post_request_job_mut = this.graphql_post_request_job.borrow_mut();
 
                     if let Some(rec) = mut_state.graphql_post_request_job.as_mut()
                     {
@@ -530,13 +478,13 @@ impl GraphQLTabState
 
                                 //Job complete - set the result
 
-                                let mut duration_millis = res.duration().as_millis().to_string(); //.get_duration().as_millis().to_string();
+                                let mut duration_millis = res.duration().as_millis().to_string();
 
                                 duration_millis.push_str(" ms");
 
                                 this.time_output_label.set_text(duration_millis.as_str());
 
-                                this.results_text.buffer().set_text(res.result().as_str()); //.get_result_ref().as_str());
+                                //this.received_text.buffer().set_text(res.result().as_str());
 
                                 //Job complete, drop the job and stop the Timeout.
 
@@ -555,7 +503,7 @@ impl GraphQLTabState
 
                                     this.time_output_label.set_text("N/A");
 
-                                    this.results_text.buffer().set_text(err.to_string().as_str());
+                                    //this.received_text.buffer().set_text(err.to_string().as_str());
 
                                     //Make sure the job has been dropped
 
@@ -577,12 +525,6 @@ impl GraphQLTabState
 
                     }
 
-                    //Drop the job if it's done. 
-
-                    //mut_state.graphql_post_request_job = None;
-
-                    //graphql_post_request_job has a None value.
-
                     //Stop the Timeout
 
                     false
@@ -596,83 +538,6 @@ impl GraphQLTabState
             false
 
         });
-
-        /*
-        this.graphql_post_request_job_timeout.set_function(move |_sto| {
-
-            if let Some(this) = weak_self.upgrade()
-            {
-
-                {
-
-                    let mut graphql_post_request_job_mut = this.graphql_post_request_job.borrow_mut();
-
-                    if let Some(rec) = graphql_post_request_job_mut.as_mut()
-                    {
-
-                        match rec.try_recv()
-                        {
-
-                            Ok(res) => 
-                            {
-
-                                //Job complete - set the result
-
-                                let mut duration_millis = res.get_duration().as_millis().to_string();
-
-                                duration_millis.push_str(" ms");
-
-                                this.time_output_label.set_text(duration_millis.as_str());
-
-                                this.results_text.buffer().set_text(res.get_result_ref().as_str());
-
-                            },
-                            Err(err) =>
-                            {
-
-                                if let OneshotTryRecvError::Closed = err
-                                {
-
-                                    //Error detected - Set the error
-
-                                    this.time_output_label.set_text("N/A");
-
-                                    this.results_text.buffer().set_text(err.to_string().as_str());
-
-                                    //Make sure the job has been dropped
-
-                                    *graphql_post_request_job_mut = None;
-
-                                    //Stop the reoccurring Timeout
-
-                                    return false;
-
-                                }
-
-                                //The Recevier is empty, try again soon.
-
-                                return true;
-
-                            }
-
-                        }
-
-                    }
-
-                    //Drop the job if it's done. 
-
-                    *graphql_post_request_job_mut = None;
-
-                }
-
-            }
-
-            //Stop the Timeout as weak_self is not upgradeable.
-
-            false
-
-        });
-        */
 
         this
 
@@ -689,7 +554,7 @@ impl GraphQLTabState
 
 }
 
-impl_as_any!(GraphQLTabState);
+impl_as_any!(WebSocketTabState);
 
 /*
 impl AsAny for GraphQLTabState
@@ -705,7 +570,7 @@ impl AsAny for GraphQLTabState
 }
 */
 
-impl WidgetStateContainer for GraphQLTabState
+impl WidgetStateContainer for WebSocketTabState
 {
 
     fn dyn_adapter(&self) -> Rc<dyn StoredWidgetObject>

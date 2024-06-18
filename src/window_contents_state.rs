@@ -30,6 +30,7 @@ use gtk_estate::corlib::{impl_as_any, as_any::AsAny};
 use gtk_estate::adw::{TabBar, TabPage, TabView};
 
 use crate::graphql_tab_state::GraphQLTabState;
+use crate::WebSocketTabState;
 
 use tokio::runtime::{Runtime, Handle, Builder};
 
@@ -174,11 +175,15 @@ impl WindowContentsState
 
             let aw_parent = find_parent::<ApplicationWindow>(root); //find_parent::<ApplicationWindow, _>(root);
 
-            let new_gql_ts = GraphQLTabState::new(&this);
+            let new_ws_ts = WebSocketTabState::new(&this);
+
+            new_ws_ts.set_contents_paned_position_halved(aw_parent.default_width());
+            
+            //let new_gql_ts = GraphQLTabState::new(&this);
 
             //let sr = parent.size_request();
 
-            new_gql_ts.set_contents_paned_position_halved(aw_parent.default_width());
+            //new_gql_ts.set_contents_paned_position_halved(aw_parent.default_width());
                 
             //}
         

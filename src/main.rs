@@ -10,6 +10,10 @@ mod graphql_tab_state;
 
 mod actors;
 
+mod web_socket_tab_state;
+
+use web_socket_tab_state::*;
+
 fn main()
 {
     
