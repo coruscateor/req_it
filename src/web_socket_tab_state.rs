@@ -1,4 +1,4 @@
-use std::cell::{RefCell, RefMut};
+use std::cell::{OnceCell, RefCell, RefMut};
 
 use std::rc::{Weak, Rc};
 
@@ -6,6 +6,7 @@ use std::any::Any;
 
 use std::sync::mpsc::TryRecvError;
 
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use gtk_estate::adw::glib::clone::Upgrade;
@@ -33,6 +34,7 @@ use corlib::rfc::{borrow_mut, borrow_mut_2};
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
 use tokio::runtime::Handle;
+use widget_ext::set_margin_sides_and_bottom;
 
 //https://gtk-rs.org/gtk4-rs/stable/latest/docs/gtk4/struct.Paned.html
 
@@ -65,6 +67,23 @@ use gtk::glib;
 use gtk::glib::clone;
 
 type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
+
+//static FORMAT_DROPDOWN_STRS: [&str] = ["JSON To CBOR", "Text"];
+
+//static FORMAT_DROPDOWN_STRS: OnceLock<std::boxed::Box<[&str]>> = OnceLock::new(); //(|| { ["JSON To CBOR", "Text"] });
+
+static FORMAT_DROPDOWN_STRS: OnceLock<&'static [&str]> = OnceLock::new();
+
+fn format_dropdown_strs() -> &'static [&'static str]
+{
+
+    FORMAT_DROPDOWN_STRS.get_or_init(||{ &["JSON To CBOR", "Text"] })
+
+}
+
+static JSON_TO_CBOR: &str = "JSON To CBOR";
+
+static TEXT: &str = "Text";
 
 struct MutState
 {
@@ -101,6 +120,9 @@ pub struct WebSocketTabState
     address_text: Text,
     connect_button: Button,
     time_output_label: Label,
+    //["JSON To CBOR", "Text"]
+    //format_dropdown: [&str],
+    format_dropdown: DropDown,
 
     //Tabpage
 
@@ -166,7 +188,6 @@ impl WebSocketTabState
 
         address_box.append(&address_text);
 
-
         header_box.append(&address_box);
 
         //Buttons and output labels - Second Row
@@ -174,6 +195,14 @@ impl WebSocketTabState
         let tool_cbox = CenterBox::new();
 
         //Left
+
+        let tool_left_box = Box::new(Orientation::Horizontal, 2);
+
+        let format_dropdown = DropDown::from_strings(format_dropdown_strs());
+
+        tool_left_box.append(&format_dropdown);
+
+        tool_cbox.set_start_widget(Some(&tool_left_box));
 
         //Center
         
@@ -184,6 +213,14 @@ impl WebSocketTabState
         tool_center_box.append(&connect_button);
 
         tool_cbox.set_center_widget(Some(&tool_center_box));
+
+        //tool_cbox.set_margin_start(5);
+
+        //tool_cbox.set_margin_end(5);
+
+        //tool_cbox.set_margin_bottom(5);
+
+        set_margin_sides_and_bottom(&tool_cbox, 5);
 
         //Right
 
@@ -222,8 +259,6 @@ impl WebSocketTabState
         //Right Side
 
         let received_paned = Paned::new(Orientation::Vertical);
-
-        
 
         contents_paned.set_end_child(Some(&received_paned));
 
@@ -347,6 +382,7 @@ impl WebSocketTabState
                 address_text,
                 connect_button,
                 time_output_label,
+                format_dropdown,
 
                 //Tabpage
 

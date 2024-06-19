@@ -6,3 +6,7 @@ mod web_socket_actor;
 
 pub use web_socket_actor::*;
 
+mod web_socket_actor_message;
+
+pub use web_socket_actor_message::*;
+
