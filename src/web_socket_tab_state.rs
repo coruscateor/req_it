@@ -72,6 +72,7 @@ type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
 
 //static FORMAT_DROPDOWN_STRS: OnceLock<std::boxed::Box<[&str]>> = OnceLock::new(); //(|| { ["JSON To CBOR", "Text"] });
 
+/*
 static FORMAT_DROPDOWN_STRS: OnceLock<&'static [&str]> = OnceLock::new();
 
 fn format_dropdown_strs() -> &'static [&'static str]
@@ -80,6 +81,13 @@ fn format_dropdown_strs() -> &'static [&'static str]
     FORMAT_DROPDOWN_STRS.get_or_init(||{ &["JSON To CBOR", "Text"] })
 
 }
+*/
+
+//static FORMAT_DROPDOWN_STRS: [&'static str; 2] = ["JSON To CBOR", "Text"];
+
+//static FORMAT_DROPDOWN_STRS: &'static [&str] = ["JSON To CBOR", "Text"];
+
+static FORMAT_DROPDOWN_STRS: &[&str] = &["JSON To CBOR", "Text"];
 
 static JSON_TO_CBOR: &str = "JSON To CBOR";
 
@@ -123,6 +131,7 @@ pub struct WebSocketTabState
     //["JSON To CBOR", "Text"]
     //format_dropdown: [&str],
     format_dropdown: DropDown,
+    send_button: Button,
 
     //Tabpage
 
@@ -172,6 +181,8 @@ impl WebSocketTabState
 
         let header_box = Box::new(Orientation::Vertical, 2);
 
+        contents_box.append(&header_box);
+
         //Address bar - First Row
 
         let address_box = Box::new(Orientation::Horizontal, 4);
@@ -192,15 +203,35 @@ impl WebSocketTabState
 
         //Buttons and output labels - Second Row
 
+        //CenterBox - Level 1
+
         let tool_cbox = CenterBox::new();
+
+        //tool_cbox.set_margin_start(5);
+
+        //tool_cbox.set_margin_end(5);
+
+        //tool_cbox.set_margin_bottom(5);
+
+        set_margin_sides_and_bottom(&tool_cbox, 5);
 
         //Left
 
-        let tool_left_box = Box::new(Orientation::Horizontal, 2);
+        let tool_left_box = Box::new(Orientation::Horizontal, 20);
 
-        let format_dropdown = DropDown::from_strings(format_dropdown_strs());
+        //Format DropDown 
+
+        let format_dropdown = DropDown::from_strings(FORMAT_DROPDOWN_STRS);
 
         tool_left_box.append(&format_dropdown);
+
+        //Send Button
+
+        let send_button = Button::builder().label("Send").build();
+
+        tool_left_box.append(&send_button);
+
+        //
 
         tool_cbox.set_start_widget(Some(&tool_left_box));
 
@@ -214,17 +245,11 @@ impl WebSocketTabState
 
         tool_cbox.set_center_widget(Some(&tool_center_box));
 
-        //tool_cbox.set_margin_start(5);
-
-        //tool_cbox.set_margin_end(5);
-
-        //tool_cbox.set_margin_bottom(5);
-
-        set_margin_sides_and_bottom(&tool_cbox, 5);
-
         //Right
 
         let tool_right_box = Box::new(Orientation::Horizontal, 2);
+
+        //Binary to BSON or JSON, JSON Only DropDown
 
         let time_label = Label::new(Some("Time:"));
 
@@ -240,7 +265,29 @@ impl WebSocketTabState
 
         header_box.append(&tool_cbox);
 
-        contents_box.append(&header_box);
+        //CenterBox - Level 2
+
+        /*
+        let tool_cbox_l2 = CenterBox::new();
+
+        set_margin_sides_and_bottom(&tool_cbox_l2, 5);
+
+        //Left
+
+        let tool_left_box = Box::new(Orientation::Horizontal, 2);
+
+        let send_button = Button::builder().label("Send").build();
+
+        tool_left_box.append(&send_button);
+
+        tool_cbox_l2.set_start_widget(Some(&tool_left_box));
+
+        //
+
+        header_box.append(&tool_cbox_l2);
+                */
+
+        //
 
         //Horizontal container pane
 
@@ -383,6 +430,7 @@ impl WebSocketTabState
                 connect_button,
                 time_output_label,
                 format_dropdown,
+                send_button,
 
                 //Tabpage
 
