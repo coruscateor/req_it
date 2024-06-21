@@ -96,7 +96,7 @@ static TEXT: &str = "Text";
 struct MutState
 {
 
-    pub graphql_post_request_job: Option<Receiver<GraphQLRequestResult>>
+    //pub graphql_post_request_job: Option<Receiver<GraphQLRequestResult>>
 
 }
 
@@ -109,7 +109,7 @@ impl MutState
         Self
         {
 
-            graphql_post_request_job: None
+            //graphql_post_request_job: None
 
         }
 
@@ -162,7 +162,7 @@ pub struct WebSocketTabState
     web_socket_actor: WebSocketActor,
     tokio_rt_handle: Handle,
 
-    graphql_post_request_job_timeout: RcSimpleTimeOut<Weak<WebSocketTabState>>,
+    web_socket_actor_poller: RcSimpleTimeOut<Weak<WebSocketTabState>>,
     mut_state: RefCell<MutState>
 
 }
@@ -459,7 +459,7 @@ impl WebSocketTabState
                 received_paned,
                 web_socket_actor,
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
-                graphql_post_request_job_timeout: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
+                web_socket_actor_poller: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
                 mut_state: RefCell::new(MutState::new())
 
             }
@@ -487,52 +487,7 @@ impl WebSocketTabState
                 borrow_mut(&this.mut_state, &this, |mut mut_state, this|
                 {
 
-   
-                    //Return if the job is already active
-    
-                    if mut_state.graphql_post_request_job.is_some()
-                    {
-    
-                        return;
-    
-                    }
-    
-                    //Request
-    
-                    let address = this.address_text.text().to_string();
-    
-                    let query = get_text_view_string(&this.to_be_sent_text);
-    
-                    //let query_variables = get_text_view_string(&this.query_variables);
-    
-                    //let http_headers = get_text_view_string(&this.http_headers);
 
-                    let es = "".to_string();
-    
-                    let message_params = GraphQLPostRequestParams::new(address, query, es.clone(), es); //query_variables, http_headers);
-    
-                    let (sender, reciver) = channel();
-    
-                    let request_message = GraphQLPostMessage::Request(message_params, sender);
-    
-                    let interactor = this.web_socket_actor.interactor();
-    
-                    let send_res = interactor.sender().blocking_send(Some(request_message));
-                    
-                    if let Err(err) = send_res
-                    {
-    
-                        //this.received_text.buffer().set_text(err.to_string().as_str());
-    
-                    }
-                    else
-                    {
-                        
-                        mut_state.graphql_post_request_job = Some(reciver);
-    
-                        this.graphql_post_request_job_timeout.start();
-    
-                    }
 
                 });
 
@@ -542,7 +497,7 @@ impl WebSocketTabState
 
         //TimeOut
 
-        this.graphql_post_request_job_timeout.set_on_time_out_fn(move |sto|
+        this.web_socket_actor_poller.set_on_time_out_fn(move |sto|
         {
 
             if let Some(this) = sto.state().upgrade()
@@ -551,63 +506,13 @@ impl WebSocketTabState
                 return borrow_mut(&this.mut_state, &this, | mut mut_state, this|
                 {
 
+                    /*
                     if let Some(rec) = mut_state.graphql_post_request_job.as_mut()
                     {
 
-                        match rec.try_recv()
-                        {
-
-                            Ok(res) => 
-                            {
-
-                                //Job complete - set the result
-
-                                let mut duration_millis = res.duration().as_millis().to_string();
-
-                                duration_millis.push_str(" ms");
-
-                                this.time_output_label.set_text(duration_millis.as_str());
-
-                                //this.received_text.buffer().set_text(res.result().as_str());
-
-                                //Job complete, drop the job and stop the Timeout.
-
-                                mut_state.graphql_post_request_job = None;
-
-                                return false;
-
-                            },
-                            Err(err) =>
-                            {
-
-                                if let OneshotTryRecvError::Closed = err
-                                {
-
-                                    //Error detected - Set the error
-
-                                    this.time_output_label.set_text("N/A");
-
-                                    //this.received_text.buffer().set_text(err.to_string().as_str());
-
-                                    //Make sure the job has been dropped
-
-                                    mut_state.graphql_post_request_job = None;
-
-                                    //Stop the reoccurring Timeout
-
-                                    return false;
-
-                                }
-
-                                //The receiver is empty, try again soon.
-
-                                return true;
-
-                            }
-
-                        }
 
                     }
+                    */
 
                     //Stop the Timeout
 
