@@ -2,7 +2,7 @@ use act_rs::{ActorFrontend, ActorState, HasInteractor, impl_mac_task_actor, Drop
 
 //impl_mac_runtime_task_actor
 
-use act_rs::tokio::{RuntimeTaskActor, interactors::mpsc::{SenderInteractor, channel}};
+use act_rs::tokio::{interactors::mpsc::{SenderInteractor, channel}};
 
 use tokio::{sync::mpsc::Receiver, runtime::Handle};
 
