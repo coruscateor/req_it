@@ -50,13 +50,9 @@ use widget_ext::set_margin_sides_and_bottom;
 
 use crate::actors::{WebSocketActor, WebSocketActorState};
 
-//GraphQLRuntimeActor,
-
-use crate::actors::graphql_actor_message::{GraphQLPostMessage, GraphQLRequestResult, GraphQLPostRequestParams};
-
 use crate::window_contents_state::WindowContentsState;
 
-use act_rs::ActorFrontend;
+use act_rs::{enter, ActorFrontend};
 
 use act_rs::tokio::interactors::mpsc::SenderInteractor;
 
@@ -407,13 +403,21 @@ impl WebSocketTabState
   
         //Try entering the runtime here instead of using a runtime actor. 
 
-        {
+        /*{
 
             let _entered_rt = wcs.tokio_rt_handle().enter();
 
             web_socket_actor = WebSocketActor::new(actor_state);
 
-        }
+        }*/
+
+        let tokio_rt_handle = wcs.tokio_rt_handle();
+
+        web_socket_actor = enter!(tokio_rt_handle, || {
+
+            WebSocketActor::new(actor_state)
+
+        });
 
         let this =  Rc::new_cyclic( move |weak_self|
         {

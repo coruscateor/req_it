@@ -29,7 +29,8 @@ use gtk_estate::corlib::{impl_as_any, as_any::AsAny};
 
 use gtk_estate::adw::{TabBar, TabPage, TabView};
 
-use crate::graphql_tab_state::GraphQLTabState;
+//use crate::graphql_tab_state::GraphQLTabState;
+
 use crate::WebSocketTabState;
 
 use tokio::runtime::{Runtime, Handle, Builder};

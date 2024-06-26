@@ -6,7 +6,7 @@ use crate::applicaion_state::ApplicationState;
 
 mod window_contents_state;
 
-mod graphql_tab_state;
+//mod graphql_tab_state;
 
 mod actors;
 

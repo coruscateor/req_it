@@ -2,14 +2,12 @@ use act_rs::{ActorFrontend, ActorState, HasInteractor, impl_mac_task_actor, Drop
 
 //impl_mac_runtime_task_actor
 
-use act_rs::tokio::{interactors::mpsc::{SenderInteractor, channel}};
+use act_rs::tokio::interactors::mpsc::{ActorIOInteractorClient, ActorIOInteractorServer, actor_io_interactors};
 
 use fastwebsockets::{handshake, WebSocket};
+
+use tokio::sync::mpsc::Sender;
 use tokio::{sync::mpsc::Receiver, runtime::Handle};
-
-use super::{graphql_actor_message::*, WebSocketActorInputMessage};
-
-use paste::paste;
 
 use std::future::Future;
 use std::{marker::PhantomData, sync::Arc};
@@ -38,6 +36,8 @@ use anyhow::Result;
 
 use hyper_util::rt::TokioIo;
 
+use super::{WebSocketActorInputMessage, WebSocketActorOutputMessage};
+
 struct SpawnExecutor;
 
 impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
@@ -63,8 +63,8 @@ impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
 pub struct WebSocketActorState
 {
 
-    sender_input: SenderInteractor<Option<WebSocketActorInputMessage>>,
-    reciver_input: Receiver<Option<WebSocketActorInputMessage>>,
+    sender_input: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Sender<WebSocketActorInputMessage>,
+    reciver_input: ActorIOInteractorServer<WebSocketActorInputMessage, WebSocketActorOutputMessage> //Receiver<WebSocketActorInputMessage>,
     //request_client: Client,
     //prettyer: PrettyEr
 
@@ -76,18 +76,17 @@ impl WebSocketActorState
     pub fn new() -> Self
     {
 
-        let (sender_input, reciver_input) = channel(50);
+        //let (sender_input, reciver_input) = channel(50);
 
-        //let request_client = Client::new();
+        //let (sender_input, reciver_input) = tokio::sync::mpsc::channel(50);
+
+        let (sender_input, reciver_input) = actor_io_interactors(10, 1000);
 
         Self
         {
 
             sender_input,
-            reciver_input,
-            //request_client,
-            //prettyer: PrettyEr::new()
-
+            reciver_input
 
         }
 
@@ -100,38 +99,33 @@ impl WebSocketActorState
     async fn run_async(&mut self, di: &DroppedIndicator) -> bool
     {
 
-        if let Some(opt) = self.reciver_input.recv().await
+        if let Some(val) = self.reciver_input.input_receiver().recv().await
         {
 
-            if let Some(val) = opt
+            match val
             {
 
-                match val
+                WebSocketActorInputMessage::ConnectTo(url) =>
                 {
 
-                    WebSocketActorInputMessage::ConnectTo(url) => //,has_started) =>
+                    match self.connect_to_server(url).await
                     {
-
-                        match self.connect_to_server(url).await
+                        Ok(res) => 
                         {
-                            Ok(res) => 
-                            {
 
-                                //res.read_frame()
+                            //res.read_frame()
 
-                            },
-                            Err(err) =>
-                            {
+                        },
+                        Err(err) =>
+                        {
 
-                                let err_string = err.to_string();
+                            let err_string = err.to_string();
 
-                                //Send Error message to the actor-client
+                            //Send Error message to the actor-client
 
-                            }
                         }
-
-
                     }
+
 
                 }
 
@@ -176,6 +170,7 @@ impl WebSocketActorState
 
     }
 
+    /*
     fn check_send_error(send_res: Result<(), GraphQLRequestResult>)
     {
 
@@ -187,13 +182,14 @@ impl WebSocketActorState
         }
 
     }
+    */
 
 }
 
-impl HasInteractor<SenderInteractor<Option<WebSocketActorInputMessage>>> for WebSocketActorState
+impl HasInteractor<ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>> for WebSocketActorState
 {
 
-    fn interactor(&self) -> &SenderInteractor<Option<WebSocketActorInputMessage>>
+    fn interactor(&self) -> &ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
     {
        
        &self.sender_input
@@ -204,4 +200,5 @@ impl HasInteractor<SenderInteractor<Option<WebSocketActorInputMessage>>> for Web
 
 //Setup the macro generated Task actor.
 
-impl_mac_task_actor!(WebSocketActorState, SenderInteractor<Option<WebSocketActorInputMessage>>, WebSocketActor);
+impl_mac_task_actor!(WebSocketActorState, ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, WebSocketActor);
+
