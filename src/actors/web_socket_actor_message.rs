@@ -1,4 +1,7 @@
+use gtk_estate::corlib::{AsStr, MovableText};
 use tokio::sync::oneshot::Sender;
+
+//use corlib::AsStr;
 
 pub enum WebSocketActorFormat
 {
@@ -24,6 +27,7 @@ pub enum WebSocketActorFormat
 
 //The WebSocket actor then communicates its connection ptogress and the connected servers output via its provided output queue.
 
+//#[derive(Debug)]
 pub enum WebSocketActorInputMessage
 {
 
@@ -31,11 +35,56 @@ pub enum WebSocketActorInputMessage
 
 }
 
+//Messages from the WebSocketActor itself.
+
+//#[derive(Debug)]
+pub enum WebSocketActorOutputClientMessage
+{
+
+    ConnectionResult(MovableText)
+
+}
+
+impl AsStr for WebSocketActorOutputClientMessage
+{
+
+    fn as_str(&self) -> &str
+    {
+
+        match self
+        {
+
+            WebSocketActorOutputClientMessage::ConnectionResult(message) =>
+            {
+
+                message.as_str()
+
+            }
+
+        }
+
+    }
+
+}
+
+//Remote server message
+
+#[derive(Debug)]
+pub enum WebSocketActorOutputServerMessage
+{
+
+
+
+}
+
+
+
+//#[derive(Debug)]
 pub enum WebSocketActorOutputMessage
 {
 
-    ClientMessage,
-    ServerMessage
+    ClientMessage(WebSocketActorOutputClientMessage),
+    ServerMessage(WebSocketActorOutputServerMessage)
 
 }
 

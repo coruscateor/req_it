@@ -10,6 +10,8 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use gtk_estate::adw::glib::clone::Upgrade;
+use gtk_estate::corlib::rfc::borrow_mut;
+use gtk_estate::corlib::upgrading::up_rc;
 use gtk_estate::gtk4::ListBox;
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
 
@@ -25,11 +27,11 @@ use gtk_estate::adw::{TabBar, TabPage, TabView};
 
 use gtk_estate::corlib::{impl_as_any, AsAny};
 
-use corlib::rfc_borrow_mut; //rfc_borrow,
+//use corlib::rfc_borrow_mut; //rfc_borrow,
 
-use corlib::upgrading::up_rc;
+//use corlib::upgrading::up_rc;
 
-use corlib::rfc::{borrow_mut, borrow_mut_2};
+//use corlib::rfc::{borrow_mut, borrow_mut_2};
 
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
@@ -48,7 +50,7 @@ use widget_ext::set_margin_sides_and_bottom;
 
 //https://web.archive.org/web/20221126181112/https://world.pages.gitlab.gnome.org/Rust/libadwaita-rs/stable/latest/docs/libadwaita/index.html
 
-use crate::actors::{WebSocketActor, WebSocketActorState};
+use crate::actors::{WebSocketActor, WebSocketActorInputMessage, WebSocketActorState};
 
 use crate::window_contents_state::WindowContentsState;
 
@@ -399,7 +401,7 @@ impl WebSocketTabState
 
         let actor_state = WebSocketActorState::new();
 
-        let web_socket_actor; //= GraphQLActor::new(actor_state); //GraphQLRuntimeActor::new(wcs.tokio_rt_handle(), actor_state);
+        //let web_socket_actor; //= GraphQLActor::new(actor_state); //GraphQLRuntimeActor::new(wcs.tokio_rt_handle(), actor_state);
   
         //Try entering the runtime here instead of using a runtime actor. 
 
@@ -413,7 +415,7 @@ impl WebSocketTabState
 
         let tokio_rt_handle = wcs.tokio_rt_handle();
 
-        web_socket_actor = enter!(tokio_rt_handle, || {
+        let web_socket_actor = enter!(tokio_rt_handle, || {
 
             WebSocketActor::new(actor_state)
 
@@ -491,7 +493,28 @@ impl WebSocketTabState
                 borrow_mut(&this.mut_state, &this, |mut mut_state, this|
                 {
 
+                    let address = this.address_text.text().to_string();
 
+                    /*
+                        `web_socket_actor_message::WebSocketActorInputMessage` doesn't implement `std::fmt::Debug`
+                        the trait `std::fmt::Debug` is not implemented for `web_socket_actor_message::WebSocketActorInputMessage`, which is required by `tokio::sync::mpsc::error::TrySendError<web_socket_actor_message::WebSocketActorInputMessage>: std::fmt::Debug`
+                        add `#[derive(Debug)]` to `web_socket_actor_message::WebSocketActorInputMessage` or manually `impl std::fmt::Debug for web_socket_actor_message::WebSocketActorInputMessage`
+                        the trait `std::fmt::Debug` is implemented for `tokio::sync::mpsc::error::TrySendError<T>`
+                        required for `tokio::sync::mpsc::error::TrySendError<web_socket_actor_message::WebSocketActorInputMessage>` to implement `std::fmt::Debug`rustcClick for full compiler diagnostic
+                        result.rs(1073, 12): required by a bound in `Result::<T, E>::unwrap`
+                        web_socket_actor_message.rs(31, 1): consider annotating `web_socket_actor_message::WebSocketActorInputMessage` with `#[derive(Debug)]`: `#[derive(Debug)]
+                        `
+                        web_socket_tab_state.rs(498, 70): consider removing this method call, as the receiver has type `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>` and `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>: std::fmt::Debug` trivially holds
+                     */
+
+                    if let Err(err) = this.web_socket_actor.interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address))
+                    {
+
+                        //Error: Counld not contact web_socket_actor.
+
+                    }
+
+                    this.web_socket_actor_poller.start();
 
                 });
 
