@@ -7,12 +7,19 @@ use std::any::Any;
 use std::sync::mpsc::TryRecvError;
 
 use std::sync::OnceLock;
+
 use std::time::Duration;
 
 use gtk_estate::adw::glib::clone::Upgrade;
-use gtk_estate::corlib::rfc::borrow_mut;
-use gtk_estate::corlib::upgrading::up_rc;
+
+//use gtk_estate::corlib::rfc::borrow_mut;
+
+//use gtk_estate::corlib::upgrading::up_rc;
+
+use corlib::upgrading::up_rc;
+
 use gtk_estate::gtk4::ListBox;
+
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
 
 use gtk_estate::{helpers::*, RcSimpleTimeOut, SimpleTimeOut, StateContainers, StoredWidgetObject, WidgetAdapter, WidgetStateContainer};
@@ -27,15 +34,14 @@ use gtk_estate::adw::{TabBar, TabPage, TabView};
 
 use gtk_estate::corlib::{impl_as_any, AsAny};
 
-//use corlib::rfc_borrow_mut; //rfc_borrow,
-
 //use corlib::upgrading::up_rc;
 
-//use corlib::rfc::{borrow_mut, borrow_mut_2};
+use corlib::rfc::borrow_mut;
 
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
 use tokio::runtime::Handle;
+
 use widget_ext::set_margin_sides_and_bottom;
 
 //https://gtk-rs.org/gtk4-rs/stable/latest/docs/gtk4/struct.Paned.html
@@ -490,13 +496,13 @@ impl WebSocketTabState
             up_rc(&weak_self, |this|
             {
 
-                borrow_mut(&this.mut_state, &this, |mut mut_state, this|
+                borrow_mut(&this.mut_state, |mut mut_state|
                 {
 
                     let address = this.address_text.text().to_string();
 
                     /*
-                        `web_socket_actor_message::WebSocketActorInputMessage` doesn't implement `std::fmt::Debug`
+                        web_socket_actor_message::WebSocketActorInputMessage` doesn't implement `std::fmt::Debug`
                         the trait `std::fmt::Debug` is not implemented for `web_socket_actor_message::WebSocketActorInputMessage`, which is required by `tokio::sync::mpsc::error::TrySendError<web_socket_actor_message::WebSocketActorInputMessage>: std::fmt::Debug`
                         add `#[derive(Debug)]` to `web_socket_actor_message::WebSocketActorInputMessage` or manually `impl std::fmt::Debug for web_socket_actor_message::WebSocketActorInputMessage`
                         the trait `std::fmt::Debug` is implemented for `tokio::sync::mpsc::error::TrySendError<T>`
@@ -527,10 +533,10 @@ impl WebSocketTabState
         this.web_socket_actor_poller.set_on_time_out_fn(move |sto|
         {
 
-            if let Some(this) = sto.state().upgrade()
+            up_rc(sto.state(), |this|
             {
 
-                return borrow_mut(&this.mut_state, &this, | mut mut_state, this|
+                borrow_mut(&this.mut_state,|mut mut_state|
                 {
 
                     /*
@@ -547,11 +553,11 @@ impl WebSocketTabState
 
                 });
                 
-            }
+            })
 
             //Stop the Timeout as weak_self is not upgradeable.
 
-            false
+            //false
 
         });
 
