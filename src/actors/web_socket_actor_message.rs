@@ -1,4 +1,7 @@
-use gtk_estate::corlib::{AsStr, MovableText};
+//use gtk_estate::corlib::{AsStr, MovableText};
+
+use corlib::text::{AsStr, MovableText};
+
 use tokio::sync::oneshot::Sender;
 
 //use corlib::AsStr;
@@ -27,7 +30,7 @@ pub enum WebSocketActorFormat
 
 //The WebSocket actor then communicates its connection ptogress and the connected servers output via its provided output queue.
 
-//#[derive(Debug)]
+#[derive(Debug)]
 pub enum WebSocketActorInputMessage
 {
 
@@ -37,7 +40,7 @@ pub enum WebSocketActorInputMessage
 
 //Messages from the WebSocketActor itself.
 
-//#[derive(Debug)]
+#[derive(Debug)]
 pub enum WebSocketActorOutputClientMessage
 {
 
@@ -79,7 +82,7 @@ pub enum WebSocketActorOutputServerMessage
 
 
 
-//#[derive(Debug)]
+#[derive(Debug)]
 pub enum WebSocketActorOutputMessage
 {
 

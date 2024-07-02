@@ -6,14 +6,22 @@ use act_rs::tokio::interactors::mpsc::{ActorIOInteractorClient, ActorIOInteracto
 
 use fastwebsockets::{handshake, WebSocket};
 
-use gtk_estate::corlib::MovableText;
+//use gtk_estate::corlib::MovableText;
+
+use corlib::text::MovableText;
+
 use hyper::body::Incoming;
+
 use hyper::Response;
+
 use tokio::io::AsyncWriteExt;
+
 use tokio::sync::mpsc::Sender;
+
 use tokio::{sync::mpsc::Receiver, runtime::Handle};
 
 use std::future::Future;
+
 use std::{marker::PhantomData, sync::Arc};
 
 use tokio::runtime::Runtime;
@@ -119,23 +127,12 @@ impl WebSocketActorState
                 WebSocketActorInputMessage::ConnectTo(url) =>
                 {
 
-                    /*
-                    if let Some(connection) = &mut self.connection_stream
+                    if url.is_empty()
                     {
 
-                        connection.shutdown();
+
 
                     }
-                    */
-
-                    /*
-                    if let Some(ws) = &mut self.web_socket
-                    {
-
-                        ws.
-
-                    }
-                    */
 
                     match self.web_socket.take()
                     {
@@ -181,12 +178,16 @@ impl WebSocketActorState
                                 result.rs(1073, 12): required by a bound in `Result::<T, E>::unwrap`
                             */
 
+                            self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::Str(CONNECTION_SUCCEEDED)))).await.unwrap();
+
+                            /*
                             if let Err(_) = self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::Str(CONNECTION_SUCCEEDED)))).await //.unwrap();
                             {
 
                                 panic!("This should've sent");
 
                             }
+                            */
 
                             //res.read_frame()
 
@@ -198,12 +199,16 @@ impl WebSocketActorState
 
                             //Send Error message to the actor-client
 
+                            self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::String(err_string)))).await.unwrap();
+
+                            /*
                             if let Err(_) = self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::String(err_string)))).await //.unwrap();
                             {
 
                                 panic!("This should've sent");
 
                             }
+                            */
 
                         }
 
