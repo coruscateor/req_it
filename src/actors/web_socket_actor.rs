@@ -52,6 +52,8 @@ use super::{WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSo
 
 static CONNECTION_SUCCEEDED: &str = "Connection Succeeded!";
 
+static EMPTY_URL_PROVIDED: &str = "Empty URL provided";
+
 //static CONNECTION_FAILED: &str = "Connection Faild!";
 
 struct SpawnExecutor;
@@ -82,7 +84,7 @@ pub struct WebSocketActorState
     sender_input: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Sender<WebSocketActorInputMessage>,
     receiver_input: ActorIOInteractorServer<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Receiver<WebSocketActorInputMessage>,
     //connection_stream: Option<TcpStream>
-    web_socket: Option<WebSocket<TokioIo<Upgraded>>>,
+    web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
     url: Option<String>
 
 }
@@ -121,104 +123,8 @@ impl WebSocketActorState
         if let Some(val) = self.receiver_input.input_receiver().recv().await
         {
 
-            match val
-            {
-
-                WebSocketActorInputMessage::ConnectTo(url) =>
-                {
-
-                    if url.is_empty()
-                    {
-
-
-
-                    }
-
-                    match self.web_socket.take()
-                    {
-
-                        Some(ws) =>
-                        {
-
-                            //Make syre the stream gets shutdown correctly.
-
-                            let _ = ws.into_inner().shutdown().await;
-
-                            //Send error or other message.
-
-                            //Make sure to get rid of the URL as well.
-
-                            self.url = None;
-
-                        }
-                        None => {}
-
-                    }
-
-                    match self.connect_to_server(&url).await
-                    {
-
-                        Ok(res) => 
-                        {
-
-                            self.web_socket = Some(res.0);
-
-                            //Do something with the connection response,
-
-                            self.url = Some(url);
-
-                            //Connected!
-
-                            /*
-                                `web_socket_actor_message::WebSocketActorOutputMessage` doesn't implement `std::fmt::Debug`
-                                the trait `std::fmt::Debug` is not implemented for `web_socket_actor_message::WebSocketActorOutputMessage`, which is required by `tokio::sync::mpsc::error::SendError<web_socket_actor_message::WebSocketActorOutputMessage>: std::fmt::Debug`
-                                add `#[derive(Debug)]` to `web_socket_actor_message::WebSocketActorOutputMessage` or manually `impl std::fmt::Debug for web_socket_actor_message::WebSocketActorOutputMessage`
-                                the trait `std::fmt::Debug` is implemented for `tokio::sync::mpsc::error::SendError<T>`
-                                required for `tokio::sync::mpsc::error::SendError<web_socket_actor_message::WebSocketActorOutputMessage>` to implement `std::fmt::Debug`rustcClick for full compiler diagnostic
-                                result.rs(1073, 12): required by a bound in `Result::<T, E>::unwrap`
-                            */
-
-                            self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::Str(CONNECTION_SUCCEEDED)))).await.unwrap();
-
-                            /*
-                            if let Err(_) = self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::Str(CONNECTION_SUCCEEDED)))).await //.unwrap();
-                            {
-
-                                panic!("This should've sent");
-
-                            }
-                            */
-
-                            //res.read_frame()
-
-                        },
-                        Err(err) =>
-                        {
-
-                            let err_string = err.to_string();
-
-                            //Send Error message to the actor-client
-
-                            self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::String(err_string)))).await.unwrap();
-
-                            /*
-                            if let Err(_) = self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::String(err_string)))).await //.unwrap();
-                            {
-
-                                panic!("This should've sent");
-
-                            }
-                            */
-
-                        }
-
-                    }
-
-
-                }
-
-            }
-
+            self.process_received_actor_input_message(val).await;
+            
         }
 
         di.not_dropped()
@@ -255,19 +161,107 @@ impl WebSocketActorState
 
     }
 
-    /*
-    fn check_send_error(send_res: Result<(), GraphQLRequestResult>)
+    async fn process_received_actor_input_message(&mut self, message: WebSocketActorInputMessage)
     {
 
-        if let Err(_err) = send_res
+        match message
         {
 
-            println!("GraphQLMessage Send Error");
+            WebSocketActorInputMessage::ConnectTo(url) =>
+            {
+
+                //Chjeck if a zero lenght string has been provided for the connection URL.
+
+                if url.is_empty()
+                {
+
+                    self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::Str(EMPTY_URL_PROVIDED)))).await.unwrap();
+
+                    return;
+
+                }
+
+                //Disconnet from current server.
+
+                match self.web_socket.take()
+                {
+
+                    Some(ws) =>
+                    {
+
+                        //Make sure the stream gets shutdown correctly.
+
+                        //let _ = ws.into_inner().shutdown().await;
+
+                        //Send error or other message.
+
+                        //Make sure to get rid of the URL as well.
+
+                        self.url = None;
+
+                    }
+                    None => {}
+
+                }
+
+                match self.connect_to_server(&url).await
+                {
+
+                    Ok(res) => 
+                    {
+
+                        //self.web_socket = Some(Arc::new(res.0));
+
+                        //let clone_me = Arc::new(res.0);
+
+                        //let send_me = clone_me.clone();
+
+                        /*
+                        future cannot be sent between threads safely
+                        the trait `Sync` is not implemented for `(dyn hyper::upgrade::Io + Send + 'static)`, which is required by `{async block@src/actors/web_socket_actor.rs:219:38: 223:26}: Send`rustcClick for full compiler diagnostic
+                        web_socket_actor.rs(221, 33): captured value is not `Send`
+                        spawn.rs(163, 21): required by a bound in `tokio::spawn`
+                         */
+
+                         /*
+                        tokio::spawn(async move {
+
+                            _ = send_me.read_frame().await;
+
+                        });
+                        */
+
+                        //Do something with the connection response,
+
+                        self.url = Some(url);
+
+                        //Connected!
+
+                        self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::Str(CONNECTION_SUCCEEDED)))).await.unwrap();
+
+
+
+                    },
+                    Err(err) =>
+                    {
+
+                        let err_string = err.to_string();
+
+                        //Send Error message to the actor-client
+
+                        self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionResult(MovableText::String(err_string)))).await.unwrap();
+
+                    }
+
+                }
+
+
+            }
 
         }
 
+
     }
-    */
 
 }
 
