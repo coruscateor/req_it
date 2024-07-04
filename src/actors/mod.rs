@@ -14,11 +14,11 @@ pub use web_socket_actor_messages::*;
 
 //pub use web_socket_interactor::*;
 
-mod inbound_web_socket_actor;
+mod frame_processor_actor_messages;
 
-pub use inbound_web_socket_actor::*;
+pub use frame_processor_actor_messages::*;
 
-mod outbound_web_socket_actor;
+mod frame_processor_actor;
 
-pub use outbound_web_socket_actor::*;
+pub use frame_processor_actor::*;
 

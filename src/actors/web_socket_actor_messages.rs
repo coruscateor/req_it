@@ -34,7 +34,8 @@ pub enum WebSocketActorFormat
 pub enum WebSocketActorInputMessage
 {
 
-    ConnectTo(String) //, Sender<()>) //URL, Has the WebSockect actor started trying to connect to the server?
+    ConnectTo(String), //, Sender<()>) //URL, Has the WebSockect actor started trying to connect to the server?
+    Disconnect
 
 }
 
@@ -44,7 +45,10 @@ pub enum WebSocketActorInputMessage
 pub enum WebSocketActorOutputClientMessage
 {
 
-    ConnectionResult(MovableText)
+    ConnectionSucceed(MovableText),
+    ConnectionFailed(MovableText),
+    Disconnected(MovableText),
+    NotDisconnected(MovableText),
 
 }
 
@@ -57,7 +61,26 @@ impl AsStr for WebSocketActorOutputClientMessage
         match self
         {
 
-            WebSocketActorOutputClientMessage::ConnectionResult(message) =>
+            WebSocketActorOutputClientMessage::ConnectionSucceed(message) =>
+            {
+
+                message.as_str()
+
+            }
+
+            WebSocketActorOutputClientMessage::ConnectionFailed(message) =>
+            {
+
+                message.as_str()
+
+            }
+            WebSocketActorOutputClientMessage::Disconnected(message) =>
+            {
+
+                message.as_str()
+
+            }
+            WebSocketActorOutputClientMessage::NotDisconnected(message) =>
             {
 
                 message.as_str()
