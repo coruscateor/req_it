@@ -2,18 +2,18 @@ use act_rs::{impl_default_on_enter_and_exit_async, impl_default_on_enter_async, 
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
-use super::{FrameProcessorActorMessage, WebSocketActorOutputMessage};
+use super::{WriteFrameProcessorActorInputMessage, WebSocketActorOutputMessage};
 
-pub struct FrameProcessorActorState
+pub struct WriteFrameProcessorActorState
 {
 
-    input_sender: Sender<FrameProcessorActorMessage>,
-    input_receiver: Receiver<FrameProcessorActorMessage>, 
+    input_sender: Sender<WriteFrameProcessorActorInputMessage>,
+    input_receiver: Receiver<WriteFrameProcessorActorInputMessage>, 
     client_sender_ouput: Sender<WebSocketActorOutputMessage>
 
 }
 
-impl FrameProcessorActorState
+impl WriteFrameProcessorActorState
 {
 
     pub fn new(client_sender_ouput: Sender<WebSocketActorOutputMessage>) -> Self
@@ -38,10 +38,10 @@ impl FrameProcessorActorState
 
 }
 
-impl HasInteractor<Sender<FrameProcessorActorMessage>> for FrameProcessorActorState
+impl HasInteractor<Sender<WriteFrameProcessorActorInputMessage>> for WriteFrameProcessorActorState
 {
 
-    fn interactor(&self) -> &Sender<FrameProcessorActorMessage>
+    fn interactor(&self) -> &Sender<WriteFrameProcessorActorInputMessage>
     {
        
        &self.input_sender

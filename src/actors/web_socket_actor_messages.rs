@@ -6,6 +6,8 @@ use tokio::sync::oneshot::Sender;
 
 //use corlib::AsStr;
 
+use fastwebsockets::{Frame};
+
 pub enum WebSocketActorFormat
 {
 
@@ -115,5 +117,34 @@ pub enum WebSocketActorOutputMessage
 }
 
 
+
+pub enum WriteFrameProcessorActorInputMessage
+{
+
+    Process(String),
+    //PassThroughToWebSocketActor()
+
+}
+
+pub enum WriteFrameProcessorActorOutputMessage
+{
+
+    Frame(Frame),
+
+}
+
+pub enum ReadFrameProcessorActorInputMessage
+{
+
+    Frame(Frame)
+
+}
+
+pub enum ReadFrameProcessorActorOutputMessage
+{
+
+    Processed(String)
+
+}
 
 

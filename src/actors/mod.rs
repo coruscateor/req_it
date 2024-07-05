@@ -14,11 +14,16 @@ pub use web_socket_actor_messages::*;
 
 //pub use web_socket_interactor::*;
 
-mod frame_processor_actor_messages;
+mod read_frame_processor_actor;
 
-pub use frame_processor_actor_messages::*;
+pub use read_frame_processor_actor::*;
 
-mod frame_processor_actor;
+mod write_frame_processor_actor;
 
-pub use frame_processor_actor::*;
+pub use write_frame_processor_actor::*;
+
+mod owned_frame;
+
+pub use owned_frame::*;
+
 

@@ -191,7 +191,9 @@ impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
 
 }
 
-//https://docs.rs/tokio/1.38.0/tokio/io/trait.AsyncWriteExt.html#method.shutdown
+//WriteFrameProcessorActor -> WebSocketActor -> ReadFrameProcessorActor
+
+//WebSocketActors input queue/channel can be accessed via WriteFrameProcessorActors inter-actor directly, allowing it to be bypassed.
 
 pub struct WebSocketActorState
 {
@@ -485,6 +487,8 @@ impl WebSocketActorState
                                 return;
         
                             }
+
+                            //Write frame
                 
                         }
 

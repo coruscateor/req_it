@@ -37,4 +37,4 @@ anyhow = "1.0.*"
 
 hyper-util = { version = "0.1.*", features = ["tokio"] }
 
-
+bytes = "1.6.0"
