@@ -73,14 +73,29 @@ impl OwnedFrame
 
     }
 
-    pub fn copy_from_frame(&mut self, frame: &mut Frame<'_>)
+    pub fn copy_from_received_frame(&mut self, frame: &mut Frame<'_>)
     {
 
         self.fin = frame.fin;
 
         self.opcode = frame.opcode;
 
-        frame.write(&mut self.payload);
+        //frame.write(&mut self.payload);
+
+        let payload = &mut self.payload;
+
+        //let payload_len = payload.len();
+
+        let frame_payload_len = frame.payload.len();
+
+        if payload.len() != frame_payload_len
+        {
+
+            payload.resize(frame_payload_len, 0)
+
+        }
+
+        payload.copy_from_slice(&frame.payload);
 
     }
 
@@ -95,6 +110,7 @@ impl OwnedFrame
 
     }
 
+    /*
     pub fn copy_into_frame(&mut self, frame: &mut Frame<'_>)
     {
 
@@ -155,6 +171,18 @@ impl OwnedFrame
             }
 
         }
+
+    }
+    */
+
+    pub fn setup_frame_to_send<'f>(&'f mut self, frame: &mut Frame<'f>)
+    {
+
+        frame.fin = self.fin;
+
+        frame.opcode = self.opcode;
+
+        frame.payload = Payload::BorrowedMut(&mut self.payload);
 
     }
 

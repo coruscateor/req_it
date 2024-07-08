@@ -239,13 +239,13 @@ impl WebSocketActorState
 
     //the non-connected loop
 
-    async fn run_async(&mut self, di: &DroppedIndicator) -> bool
+    async fn run_async(&mut self) -> bool
     {
 
-        if let Some(val) = self.receiver_input.input_receiver().recv().await
+        if let Some(message) = self.receiver_input.input_receiver().recv().await
         {
 
-            if self.process_received_actor_input_message(val).await
+            if self.process_received_actor_input_message(message).await
             {
 
                 //Connected loop
@@ -264,13 +264,13 @@ impl WebSocketActorState
             
         }
 
-        di.not_dropped()
+        true
 
     }
 
     //Make sure that the server gets disconnected. 
 
-    async fn on_exit_async(&mut self, _di: &DroppedIndicator)
+    async fn on_exit_async(&mut self)
     {
 
         self.disconnect_from_server().await;

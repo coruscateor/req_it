@@ -2,7 +2,7 @@ use act_rs::{impl_default_on_enter_and_exit_async, impl_default_on_enter_async, 
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
-use super::{ReadFrameProcessorActorInputMessage, WebSocketActorOutputMessage};
+use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorOutputMessage};
 
 use std::sync::Arc;
 
@@ -40,6 +40,13 @@ impl ReadFrameProcessorActorState
 
     //impl_default_on_enter_async!();
 
+    async fn run_async(&mut self) -> bool
+    {
+
+        true
+
+    }
+
 }
 
 impl HasInteractor<Sender<ReadFrameProcessorActorInputMessage>> for ReadFrameProcessorActorState
@@ -54,4 +61,4 @@ impl HasInteractor<Sender<ReadFrameProcessorActorInputMessage>> for ReadFramePro
 
 }
 
-impl_mac_task_actor!(ReadFrameProcessorActorState, ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, ReadFrameProcessorActor);
+impl_mac_task_actor!(ReadFrameProcessorActorState, Sender<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActor);

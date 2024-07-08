@@ -8,6 +8,8 @@ use tokio::sync::oneshot::Sender;
 
 use fastwebsockets::{Frame};
 
+const MAX_HEAD_SIZE: usize = 16;
+
 pub enum WebSocketActorFormat
 {
 
@@ -129,14 +131,14 @@ pub enum WriteFrameProcessorActorInputMessage
 pub enum WriteFrameProcessorActorOutputMessage
 {
 
-    Frame(Frame),
+    Frame() //Frame),
 
 }
 
 pub enum ReadFrameProcessorActorInputMessage
 {
 
-    Frame(Frame)
+    Frame() //Frame)
 
 }
 
