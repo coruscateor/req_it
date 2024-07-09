@@ -8,6 +8,8 @@ use tokio::sync::oneshot::Sender;
 
 use fastwebsockets::{Frame};
 
+use super::OwnedFrame;
+
 const MAX_HEAD_SIZE: usize = 16;
 
 pub enum WebSocketActorFormat
@@ -39,7 +41,8 @@ pub enum WebSocketActorInputMessage
 {
 
     ConnectTo(String), //, Sender<()>) //URL, Has the WebSockect actor started trying to connect to the server?
-    Disconnect
+    Disconnect,
+    WriteFrame(OwnedFrame)
 
 }
 
@@ -52,7 +55,7 @@ pub enum WebSocketActorOutputClientMessage
     ConnectionSucceed(MovableText),
     ConnectionFailed(MovableText),
     Disconnected(MovableText),
-    NotDisconnected(MovableText),
+    NotConnected(MovableText),
 
 }
 
@@ -84,7 +87,7 @@ impl AsStr for WebSocketActorOutputClientMessage
                 message.as_str()
 
             }
-            WebSocketActorOutputClientMessage::NotDisconnected(message) =>
+            WebSocketActorOutputClientMessage::NotConnected(message) =>
             {
 
                 message.as_str()
@@ -103,7 +106,8 @@ impl AsStr for WebSocketActorOutputClientMessage
 pub enum WebSocketActorOutputServerMessage
 {
 
-
+    Read(OwnedFrame),
+    Error(String)
 
 }
 

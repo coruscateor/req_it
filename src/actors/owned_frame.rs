@@ -14,6 +14,7 @@ pub enum OwnedPayload
 }
 */
 
+#[derive(Debug)]
 pub struct OwnedFrame
 {
 
@@ -73,7 +74,7 @@ impl OwnedFrame
 
     }
 
-    pub fn copy_from_received_frame(&mut self, frame: &mut Frame<'_>)
+    pub fn copy_from_read_frame(&mut self, frame: &Frame<'_>)
     {
 
         self.fin = frame.fin;
@@ -96,7 +97,7 @@ impl OwnedFrame
         }
 
         payload.copy_from_slice(&frame.payload);
-
+        
     }
 
     pub fn reset(&mut self,)
@@ -175,7 +176,7 @@ impl OwnedFrame
     }
     */
 
-    pub fn setup_frame_to_send<'f>(&'f mut self, frame: &mut Frame<'f>)
+    pub fn setup_frame_to_be_written<'f>(&'f mut self, frame: &mut Frame<'f>)
     {
 
         frame.fin = self.fin;
@@ -183,6 +184,17 @@ impl OwnedFrame
         frame.opcode = self.opcode;
 
         frame.payload = Payload::BorrowedMut(&mut self.payload);
+
+    }
+
+    pub fn new_frame_to_be_written(&mut self) -> Frame
+    {
+
+        let mut frame = Frame::new(false, OpCode::Continuation, None, vec![].into());
+
+        self.setup_frame_to_be_written(&mut frame);
+
+        frame
 
     }
 

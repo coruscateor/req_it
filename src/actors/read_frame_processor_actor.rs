@@ -13,14 +13,14 @@ pub struct ReadFrameProcessorActorState
 
     input_sender: Sender<ReadFrameProcessorActorInputMessage>,
     input_receiver: Receiver<ReadFrameProcessorActorInputMessage>, 
-    client_sender_ouput: Sender<WebSocketActorOutputMessage>
+    client_sender_ouput: Sender<ReadFrameProcessorActorOutputMessage>
 
 }
 
 impl ReadFrameProcessorActorState
 {
 
-    pub fn new(client_sender_ouput: Sender<WebSocketActorOutputMessage>) -> Self
+    pub fn new(client_sender_ouput: Sender<ReadFrameProcessorActorOutputMessage>) -> Self
     {
 
         let (sender, receiver) = channel(1000);

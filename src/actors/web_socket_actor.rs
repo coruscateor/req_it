@@ -48,15 +48,17 @@ use anyhow::Result;
 
 use hyper_util::rt::TokioIo;
 
-use super::{WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
+use crate::actors::{OwnedFrame, WebSocketActorOutputServerMessage};
+
+use super::{ReadFrameProcessorActor, WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
-static EMPTY_URL_PROVIDED: &str = "Empty URL provided";
+static ERROR_EMPTY_URL_PROVIDED: &str = "Error: Empty URL provided";
 
 static SERVER_DISCONNECTED: &str = "Server disconnected";
 
-static NO_SERVER_CONNECTED: &str = "No server connected";
+static ERROR_NO_SERVER_CONNECTED: &str = "Error: No server connected";
 
 //static CONNECTION_FAILED: &str = "Connection Faild!";
 
@@ -202,14 +204,16 @@ pub struct WebSocketActorState
     receiver_input: ActorIOInteractorServer<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Receiver<WebSocketActorInputMessage>,
     //connection_stream: Option<TcpStream>
     current_connection: Option<CurrentConnection>, //web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
-    url: Option<String>
+    url: Option<String>,
+    //temp_frame: Frame<'_>
+    read_frame_processor_actor: ReadFrameProcessorActor
 
 }
 
 impl WebSocketActorState
 {
 
-    pub fn new() -> Self
+    pub fn new(read_frame_processor_actor: ReadFrameProcessorActor) -> Self
     {
 
         //let (sender_input, reciver_input) = channel(50);
@@ -225,7 +229,8 @@ impl WebSocketActorState
             receiver_input,
             //web_socket: None,
             current_connection: None,
-            url: None
+            url: None,
+            read_frame_processor_actor //: ReadFrameProcessorActor::new(state)
 
         }
 
@@ -345,7 +350,7 @@ impl WebSocketActorState
         if url.is_empty()
         {
 
-            self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::Str(EMPTY_URL_PROVIDED)))).await.unwrap();
+            self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::Str(ERROR_EMPTY_URL_PROVIDED)))).await.unwrap();
 
             return false;
 
@@ -433,9 +438,17 @@ impl WebSocketActorState
             WebSocketActorInputMessage::Disconnect =>
             {
 
-                self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotDisconnected(MovableText::Str(NO_SERVER_CONNECTED)))).await.unwrap();
+                self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await.unwrap();
 
                 return false;
+
+            },
+            WebSocketActorInputMessage::WriteFrame(_owned_frame) =>
+            {
+
+                self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await.unwrap();
+
+                false
 
             }
 
@@ -449,13 +462,19 @@ impl WebSocketActorState
 
         //Connected to a server
 
-        loop {
+        /*
+        cannot borrow `*self` as mutable more than once at a time
+        second mutable borrow occurs hererustcClick for full compiler diagnostic
+        web_socket_actor.rs(461, 18): first mutable borrow occurs here
+        web_socket_actor.rs(523, 23): first borrow later used here
+        */
 
-            //let input_receiver = self.receiver_input.input_receiver().recv();
+        //let ws = self.current_connection.as_mut().unwrap();
 
-            let ws = self.current_connection.as_mut().unwrap(); //web_socket.as_mut().unwrap();
+        loop
+        {
 
-            //ws.read_frame()
+            let ws = self.current_connection.as_mut().unwrap();
 
             select! {
 
@@ -487,8 +506,25 @@ impl WebSocketActorState
                                 return;
         
                             }
+                            WebSocketActorInputMessage::WriteFrame(mut owned_frame) =>
+                            {
+                
+                                //Write frame
 
-                            //Write frame
+                                let frame = owned_frame.new_frame_to_be_written();
+
+                                if let Err(err) = ws.write_frame(frame).await
+                                {
+
+                                    self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(err.to_string()))).await.unwrap();
+
+                                    self.disconnect_from_server().await;
+
+                                    return;
+
+                                }
+
+                            }                
                 
                         }
 
@@ -504,7 +540,13 @@ impl WebSocketActorState
                         Ok(frame) =>
                         {
 
-                            //Send frame
+                            //Get from cache...
+
+                            let mut of = OwnedFrame::new();
+
+                            of.copy_from_read_frame(&frame);
+
+                            self.read_frame_processor_actor.interactor().
 
                         },
                         Err(err) =>
