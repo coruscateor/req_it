@@ -1,5 +1,4 @@
-use std::rc::Rc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use act_rs::{impl_default_on_enter_and_exit_async, impl_default_on_enter_async, impl_default_on_exit_async, impl_mac_task_actor, tokio::interactors::mpsc::ActorIOInteractorClient, ActorFrontend, DroppedIndicator, HasInteractor};
 
@@ -8,7 +7,7 @@ use corlib::{impl_get_ref};
 use fastwebsockets::{OpCode, Payload};
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
-use super::{ReadFrameProcessorActor, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorOutputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
+use super::{ReadFrameProcessorActor, ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorOutputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
 
 use super::OwnedFrame;
 
@@ -18,14 +17,15 @@ pub struct WriteFrameProcessorActorInteractor
 
     sender: Sender<WriteFrameProcessorActorInputMessage>,
     web_socket_actor_interactor: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>,
-    read_frame_proccessor_output_receiver: Rc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
+    //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
+    read_frame_actor_interactor: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
 
 }
 
 impl WriteFrameProcessorActorInteractor
 {
 
-    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_actor_interactor: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_proccessor_output_receiver: Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
+    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_actor_interactor: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_interactor: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
     {
 
         Self
@@ -33,7 +33,8 @@ impl WriteFrameProcessorActorInteractor
 
             sender,
             web_socket_actor_interactor,
-            read_frame_proccessor_output_receiver: Rc::new(Mutex::new(read_frame_proccessor_output_receiver))
+            //read_frame_proccessor_output_receiver //: Arc::new(Mutex::new(read_frame_proccessor_output_receiver))
+            read_frame_actor_interactor
 
         }
 
@@ -43,14 +44,18 @@ impl WriteFrameProcessorActorInteractor
 
     impl_get_ref!(web_socket_actor_interactor, ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>);
 
-    //impl_get_ref!(read_frame_proccessor_output_receiver, Rc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>);
+    //impl_get_ref!(read_frame_proccessor_output_receiver, Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>);
 
+    impl_get_ref!(read_frame_actor_interactor, ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>);
+
+    /*
     pub fn read_frame_proccessor_output_receiver(&self) -> &Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>
     {
 
         &self.read_frame_proccessor_output_receiver
 
     }
+    */
 
 
 }
@@ -76,13 +81,19 @@ impl WriteFrameProcessorActorState
 
         //let (read_frame_proccessor_input_sender, read_frame_proccessor_input_receiver) = channel(1000);
 
-        let (read_frame_proccessor_output_sender, read_frame_proccessor_output_receiver) = channel(1000);
+        //The ReadFrameProcessorActor ou
 
-        let read_frame_processor_actor = ReadFrameProcessorActor::new(ReadFrameProcessorActorState::new(read_frame_proccessor_output_sender));
+        //let (read_frame_proccessor_input_sender, read_frame_proccessor_input_receiver) = channel(1000);
 
-        let web_socket_actor = WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor));
+        let read_frame_processor_actor = ReadFrameProcessorActor::new(ReadFrameProcessorActorState::new()); //read_frame_proccessor_input_receiver));
 
-        let interactor = WriteFrameProcessorActorInteractor::new(sender, web_socket_actor.interactor().clone(), read_frame_proccessor_output_receiver);
+        //let read_frame_proccessor_output_receiver = read_frame_processor_actor.interactor().clone();
+
+        let read_frame_processor_actor_interactor = read_frame_processor_actor.interactor().clone();
+
+        let web_socket_actor = WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor)); //, read_frame_proccessor_input_sender));
+
+        let interactor = WriteFrameProcessorActorInteractor::new(sender, web_socket_actor.interactor().clone(), read_frame_processor_actor_interactor); //read_frame_proccessor_output_receiver);
 
         Self
         {
@@ -137,7 +148,7 @@ impl WriteFrameProcessorActorState
 
                         payload.copy_from_slice(content_bytes);
 
-                        self.web_socket_actor.interactor().input_sender().send(WebSocketActorInputMessage::WriteFrame(of));
+                        self.web_socket_actor.interactor().input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await.unwrap();
 
                     },
 
@@ -169,5 +180,12 @@ impl HasInteractor<WriteFrameProcessorActorInteractor> for WriteFrameProcessorAc
     }
 
 }
+
+/*
+
+future cannot be sent between threads safely
+within `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:56:30: 60:18}`, the trait `Send` is not implemented for `std::rc::Rc<std::sync::Mutex<tokio::sync::mpsc::Receiver<web_socket_actor_messages::ReadFrameProcessorActorOutputMessage>>>`, which is required by `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:56:30: 60:18}: Send`
+
+ */
 
 impl_mac_task_actor!(WriteFrameProcessorActorState, WriteFrameProcessorActorInteractor, WriteFrameProcessorActor);

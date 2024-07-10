@@ -122,8 +122,7 @@ pub enum WebSocketActorOutputMessage
 
 }
 
-
-
+#[derive(Debug)]
 pub enum WriteFrameProcessorActorInputMessage
 {
 
@@ -132,20 +131,27 @@ pub enum WriteFrameProcessorActorInputMessage
 
 }
 
+/*
+#[derive(Debug)]
 pub enum WriteFrameProcessorActorOutputMessage
 {
 
-    Frame() //Frame),
+    Frame(OwnedFrame) //Frame),
 
 }
+*/
 
+//WriteFrameProcessorActor output
+
+#[derive(Debug)]
 pub enum ReadFrameProcessorActorInputMessage
 {
 
-    Frame() //Frame)
+    Frame(OwnedFrame) //Frame)
 
 }
 
+#[derive(Debug)]
 pub enum ReadFrameProcessorActorOutputMessage
 {
 

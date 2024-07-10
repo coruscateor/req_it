@@ -48,7 +48,7 @@ use anyhow::Result;
 
 use hyper_util::rt::TokioIo;
 
-use crate::actors::{OwnedFrame, WebSocketActorOutputServerMessage};
+use crate::actors::{OwnedFrame, ReadFrameProcessorActorInputMessage, WebSocketActorOutputServerMessage};
 
 use super::{ReadFrameProcessorActor, WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
@@ -206,14 +206,15 @@ pub struct WebSocketActorState
     current_connection: Option<CurrentConnection>, //web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
     url: Option<String>,
     //temp_frame: Frame<'_>
-    read_frame_processor_actor: ReadFrameProcessorActor
+    read_frame_processor_actor: ReadFrameProcessorActor,
+    //read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage> //Next stage input sender
 
 }
 
 impl WebSocketActorState
 {
 
-    pub fn new(read_frame_processor_actor: ReadFrameProcessorActor) -> Self
+    pub fn new(read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         //let (sender_input, reciver_input) = channel(50);
@@ -230,7 +231,8 @@ impl WebSocketActorState
             //web_socket: None,
             current_connection: None,
             url: None,
-            read_frame_processor_actor //: ReadFrameProcessorActor::new(state)
+            read_frame_processor_actor, //: ReadFrameProcessorActor::new(state)
+            //read_frame_proccessor_input_sender
 
         }
 
@@ -516,9 +518,7 @@ impl WebSocketActorState
                                 if let Err(err) = ws.write_frame(frame).await
                                 {
 
-                                    self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(err.to_string()))).await.unwrap();
-
-                                    self.disconnect_from_server().await;
+                                    self.on_web_socket_error(err);
 
                                     return;
 
@@ -546,7 +546,7 @@ impl WebSocketActorState
 
                             of.copy_from_read_frame(&frame);
 
-                            self.read_frame_processor_actor.interactor().
+                            self.read_frame_processor_actor.interactor().input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await.unwrap(); //read_frame_proccessor_input_sender.send(ReadFrameProcessorActorInputMessage::Frame(of)).await.unwrap();
 
                         },
                         Err(err) =>
@@ -555,6 +555,10 @@ impl WebSocketActorState
                             //Send Error
 
                             //Disconnect
+
+                            self.on_web_socket_error(err);
+
+                            return;
 
                         }
 
@@ -597,6 +601,15 @@ impl WebSocketActorState
             */
 
         }
+
+    }
+
+    async fn on_web_socket_error(&mut self, error: WebSocketError)
+    {
+
+        self.receiver_input.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await.unwrap();
+
+        self.disconnect_from_server().await;
 
     }
 
