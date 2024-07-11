@@ -56,13 +56,13 @@ use widget_ext::set_margin_sides_and_bottom;
 
 //https://web.archive.org/web/20221126181112/https://world.pages.gitlab.gnome.org/Rust/libadwaita-rs/stable/latest/docs/libadwaita/index.html
 
-use crate::actors::{WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActor, WriteFrameProcessorActorState};
+use crate::actors::{WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActor, WriteFrameProcessorActorIOClient, WriteFrameProcessorActorState};
 
 use crate::window_contents_state::WindowContentsState;
 
 use act_rs::{enter, ActorFrontend};
 
-use act_rs::tokio::interactors::mpsc::SenderInteractor;
+//use act_rs::tokio::interactors::mpsc::SenderInteractor;
 
 use tokio::sync::oneshot::{Sender, Receiver, channel};
 
@@ -164,7 +164,8 @@ pub struct WebSocketTabState
     to_be_sent_paned: Paned,
     received_paned: Paned,
     //web_socket_actor: WebSocketActor,
-    write_frame_processor_actor: WriteFrameProcessorActor,
+    //write_frame_processor_actor: WriteFrameProcessorActor,
+    write_frame_processor_actor_io_client: WriteFrameProcessorActorIOClient,
     tokio_rt_handle: Handle,
 
     web_socket_actor_poller: RcSimpleTimeOut<Weak<WebSocketTabState>>,
@@ -424,11 +425,13 @@ impl WebSocketTabState
 
         //let web_socket_actor 
         
-        let write_frame_processor_actor = enter!(tokio_rt_handle, || {
+        let write_frame_processor_actor_io_client = enter!(tokio_rt_handle, || {
 
             //WebSocketActor::new(actor_state)
 
-            WriteFrameProcessorActor::new(actor_state)
+            //WriteFrameProcessorActor::new(actor_state)
+
+            WriteFrameProcessorActorState::spawn()
 
         });
 
@@ -475,7 +478,8 @@ impl WebSocketTabState
                 to_be_sent_paned,
                 received_paned,
                 //web_socket_actor,
-                write_frame_processor_actor,
+                //write_frame_processor_actor,
+                write_frame_processor_actor_io_client,
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
                 web_socket_actor_poller: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
                 mut_state: RefCell::new(MutState::new())
@@ -519,7 +523,7 @@ impl WebSocketTabState
                         web_socket_tab_state.rs(498, 70): consider removing this method call, as the receiver has type `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>` and `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>: std::fmt::Debug` trivially holds
                      */
 
-                    if let Err(err) = this.write_frame_processor_actor.interactor().web_socket_actor_interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //web_socket_actor.interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address))
+                    if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_actor_io_client().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //web_socket_actor.interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address))
                     {
 
                         //Error: Counld not contact web_socket_actor.

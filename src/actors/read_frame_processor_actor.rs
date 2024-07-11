@@ -1,4 +1,6 @@
-use act_rs::{impl_default_on_enter_and_exit_async, impl_default_on_enter_async, impl_default_on_exit_async, impl_mac_task_actor, tokio::interactors::mpsc::{ActorIOInteractorClient, ActorIOInteractorServer, actor_io_interactors}, DroppedIndicator, HasInteractor};
+use act_rs::{impl_default_beginning_and_ending_async, impl_default_beginning_async, impl_default_ending_async, impl_mac_task_actor, tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io}};
+
+use fastwebsockets::OpCode;
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
@@ -7,6 +9,10 @@ use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMe
 use std::sync::{Arc, Mutex};
 
 use act_rs::ActorFrontend;
+
+use tokio::task::JoinHandle;
+
+//super::OwnedFrame;
 
 pub struct ReadFrameProcessorActorState
 {
@@ -18,15 +24,15 @@ pub struct ReadFrameProcessorActorState
     ouput_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
     */
 
-    io_client: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //Should really only be on the "client side".
-    io_server: ActorIOInteractorServer<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
+    //io_client: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //Should really only be on the "client side".
+    io_server: ActorIOServer<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
 
 }
 
 impl ReadFrameProcessorActorState
 {
 
-    pub fn new() -> Self //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new() -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         /*
@@ -42,19 +48,31 @@ impl ReadFrameProcessorActorState
         }
         */
 
-        let (io_client, io_server) = actor_io_interactors(1000, 1000);
+        let (io_client, io_server) = actor_io(1000, 1000);
 
+        (io_client,
         Self
         {
 
-            io_client,
+            //io_client,
             io_server
 
-        }
+        })
 
     }
 
-    impl_default_on_enter_and_exit_async!();
+    pub fn spawn() -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
+    {
+
+        let (io_client, state) = ReadFrameProcessorActorState::new();
+
+        ReadFrameProcessorActor::spawn(state);
+
+        io_client
+
+    }
+
+    impl_default_beginning_and_ending_async!();
 
     //impl_default_on_enter_async!();
 
@@ -64,7 +82,42 @@ impl ReadFrameProcessorActorState
         if let Some(message) = self.io_server.input_receiver().recv().await //.input_receiver.recv().await
         {
 
+            let output;
 
+            match message
+            {
+
+                ReadFrameProcessorActorInputMessage::Frame(frame) =>
+                {
+
+                    if frame.opcode == OpCode::Text
+                    {
+        
+                        //let opcode = format!("{}", frame.opcode);
+
+                        let payload_as_utf8 = String::from_utf8_lossy(&frame.payload);
+
+                        output = format!("{{fin: {fin},\nopcode: {opcode:?},\npayload_as_utf8: {payload_as_utf8}}}", fin = frame.fin, opcode = frame.opcode)
+        
+                    }
+                    else if frame.opcode == OpCode::Binary || frame.opcode == OpCode::Continuation
+                    {
+
+                        output = format!("{{fin: {fin},\nopcode: {opcode:?},\npayload {payload:?}}}", fin = frame.fin, opcode = frame.opcode, payload = frame.payload)
+
+                    }
+                    else
+                    {
+
+                        output = format!("{{fin: {fin},\nopcode: {opcode:?},\npayload {payload:?}}}", fin = frame.fin, opcode = frame.opcode, payload = frame.payload)
+                        
+                    }
+
+                }
+                
+            }
+
+            let _ = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await; //.unwrap();
 
             return true;
 
@@ -76,16 +129,4 @@ impl ReadFrameProcessorActorState
 
 }
 
-impl HasInteractor<ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>> for ReadFrameProcessorActorState
-{
-
-    fn interactor(&self) -> &ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage> //&Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
-    {
-       
-       &self.io_client //ouput_receiver
-
-    }
-
-}
-
-impl_mac_task_actor!(ReadFrameProcessorActorState, ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, ReadFrameProcessorActor);
+impl_mac_task_actor!(ReadFrameProcessorActorState, ReadFrameProcessorActor);
