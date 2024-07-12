@@ -1,4 +1,4 @@
-use act_rs::{ActorFrontend, ActorState, impl_mac_task_actor, impl_default_beginning_async, impl_default_ending_async, impl_default_beginning_and_ending_async};
+use act_rs::{ActorFrontend, ActorState, impl_mac_task_actor, impl_default_start_async, impl_default_end_async, impl_default_start_and_end_async};
 
 //impl_mac_runtime_task_actor
 
@@ -51,6 +51,8 @@ use tokio::task::JoinHandle;
 use crate::actors::{OwnedFrame, ReadFrameProcessorActorInputMessage, WebSocketActorOutputServerMessage};
 
 use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
+
+use paste::paste;
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
@@ -173,6 +175,31 @@ impl CurrentConnection
 
 }
 
+enum ConnectedLoopExitReason
+{
+
+    ActorIOClientDisconnected,
+    ServerDisconnectedOrConnectionError,
+    InvalidInput
+
+}
+
+impl ConnectedLoopExitReason
+{
+
+    pub fn should_continue(&self) -> bool
+    {
+
+        match self
+        {
+            ConnectedLoopExitReason::ActorIOClientDisconnected => false,
+            ConnectedLoopExitReason::ServerDisconnectedOrConnectionError | ConnectedLoopExitReason::InvalidInput => true
+        }
+
+    }
+
+}
+
 struct SpawnExecutor;
 
 impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
@@ -255,7 +282,7 @@ impl WebSocketActorState
 
     //impl_default_on_enter_and_exit_async!();
 
-    impl_default_beginning_async!();
+    impl_default_start_async!();
 
     //The non-connected loop
 
@@ -270,7 +297,12 @@ impl WebSocketActorState
 
                 //Connected loop
 
-                self.connected_loop().await;
+                if !self.connected_loop().await
+                {
+
+                    return false;
+
+                }
 
             }
             
@@ -284,7 +316,7 @@ impl WebSocketActorState
 
     //Make sure that the server gets disconnected. 
 
-    async fn ending_async(&mut self)
+    async fn end_async(&mut self)
     {
 
         self.disconnect_from_server().await;
@@ -321,7 +353,7 @@ impl WebSocketActorState
 
     }
 
-    async fn disconnect_from_server(&mut self)
+    async fn disconnect_from_server(&mut self) -> Option<ConnectedLoopExitReason>
     {
 
         match self.current_connection.take() //.web_socket.take()
@@ -342,16 +374,23 @@ impl WebSocketActorState
 
                 self.url = None;
 
-                self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await.unwrap();
+                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
+                {
+
+                    return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+                }
 
             }
             None => {}
 
         }
 
+        None
+
     }
 
-    async fn prepare_for_new_connection_and_connect(&mut self, url: String) -> bool
+    async fn prepare_for_new_connection_and_connect(&mut self, url: String) -> Option<ConnectedLoopExitReason> //bool
     {
 
         //Check if a zero length string has been provided for the connection URL.
@@ -359,15 +398,29 @@ impl WebSocketActorState
         if url.is_empty()
         {
 
-            self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::Str(ERROR_EMPTY_URL_PROVIDED)))).await.unwrap();
+            if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::Str(ERROR_EMPTY_URL_PROVIDED)))).await
+            {
 
-            return false;
+                return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+            }
+
+            //return false;
+
+            return Some(ConnectedLoopExitReason::InvalidInput);
 
         }
 
         //Disconnet from current server.
 
-        self.disconnect_from_server().await;
+        let res = self.disconnect_from_server().await;
+
+        if res.is_some()
+        {
+
+            return res;
+
+        }
 
         match self.connect_to_server(&url).await
         {
@@ -408,9 +461,16 @@ impl WebSocketActorState
 
                 //Connected!
 
-                self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await.unwrap();
+                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await
+                {
 
-                return true;
+                    //return false;
+
+                    return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+                }
+
+                //return true;
 
             },
             Err(err) =>
@@ -420,15 +480,28 @@ impl WebSocketActorState
 
                 //Send Error message to the actor-client
 
-                self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await.unwrap();
+                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await
+                {
+
+                    return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+                    //return false;
+
+                }
+
+                return Some(ConnectedLoopExitReason::ServerDisconnectedOrConnectionError);
 
             }
 
         }
 
-        false
+        //false
+
+        None
 
     }
+
+    //Not connected to a server, should continue?
 
     async fn process_received_actor_input_message(&mut self, message: WebSocketActorInputMessage) -> bool
     {
@@ -441,32 +514,69 @@ impl WebSocketActorState
             WebSocketActorInputMessage::ConnectTo(url) =>
             {
 
-                return self.prepare_for_new_connection_and_connect(url).await;
+                //return self.prepare_for_new_connection_and_connect(url).await;
+
+                return Self::continue_or_not(self.prepare_for_new_connection_and_connect(url).await);
 
             }
             WebSocketActorInputMessage::Disconnect =>
             {
 
-                self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await.unwrap();
+                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
+                {
 
-                return false;
+                    return false;
+
+                }
+
+                true
 
             },
             WebSocketActorInputMessage::WriteFrame(_owned_frame) =>
             {
 
-                self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await.unwrap();
+                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
+                {
 
-                false
+                    return false;
+
+                }
+
+                true
 
             }
-
 
         }
 
     }
 
-    async fn connected_loop(&mut self) //-> bool
+    fn continue_or_not(opt_cler: Option<ConnectedLoopExitReason>) -> bool
+    {
+
+        match opt_cler
+        {
+
+            Some(res) =>
+            {
+
+                return res.should_continue();
+
+            },
+            None =>
+            {
+
+                return true;
+                
+            }
+
+        }
+
+
+    }
+
+    //The loop for when connected to a server, should the actor continue after this?
+
+    async fn connected_loop(&mut self) -> bool //ConnectedLoopExitReason
     {
 
         //Connected to a server
@@ -499,20 +609,13 @@ impl WebSocketActorState
                             WebSocketActorInputMessage::ConnectTo(url) =>
                             {
                 
-                                if !self.prepare_for_new_connection_and_connect(url).await
-                                {
-                
-                                    return; // false;
-                
-                                }
+                                return Self::continue_or_not(self.prepare_for_new_connection_and_connect(url).await);
                 
                             }
                             WebSocketActorInputMessage::Disconnect =>
                             {
         
-                                self.disconnect_from_server().await;
-        
-                                return;
+                                return Self::continue_or_not(self.disconnect_from_server().await);
         
                             }
                             WebSocketActorInputMessage::WriteFrame(mut owned_frame) =>
@@ -525,15 +628,21 @@ impl WebSocketActorState
                                 if let Err(err) = ws.write_frame(frame).await
                                 {
 
-                                    self.on_web_socket_error(err);
-
-                                    return;
+                                    return Self::continue_or_not(self.on_web_socket_error(err).await);
 
                                 }
 
                             }                
                 
                         }
+
+                    }
+                    else
+                    {
+
+                        //ActorIOCleint input receiver has disconnected.
+
+                        return false;
 
                     }
 
@@ -563,9 +672,7 @@ impl WebSocketActorState
 
                             //Disconnect
 
-                            self.on_web_socket_error(err).await;
-
-                            return;
+                            return Self::continue_or_not(self.on_web_socket_error(err).await);
 
                         }
 
@@ -611,12 +718,17 @@ impl WebSocketActorState
 
     }
 
-    async fn on_web_socket_error(&mut self, error: WebSocketError)
+    async fn on_web_socket_error(&mut self, error: WebSocketError) -> Option<ConnectedLoopExitReason>
     {
 
-        self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await.unwrap();
+        if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await
+        {
 
-        self.disconnect_from_server().await;
+            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+        }
+
+        self.disconnect_from_server().await
 
     }
 
@@ -624,5 +736,6 @@ impl WebSocketActorState
 
 //Setup the macro generated Task actor.
 
-impl_mac_task_actor!(WebSocketActorState, WebSocketActor);
+impl_mac_task_actor!(WebSocketActor);
+
 

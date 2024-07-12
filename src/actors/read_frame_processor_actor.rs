@@ -1,4 +1,4 @@
-use act_rs::{impl_default_beginning_and_ending_async, impl_default_beginning_async, impl_default_ending_async, impl_mac_task_actor, tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io}};
+use act_rs::{impl_default_start_and_end_async, impl_default_start_async, impl_default_end_async, impl_mac_task_actor, tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io}};
 
 use fastwebsockets::OpCode;
 
@@ -11,6 +11,8 @@ use std::sync::{Arc, Mutex};
 use act_rs::ActorFrontend;
 
 use tokio::task::JoinHandle;
+
+use paste::paste;
 
 //super::OwnedFrame;
 
@@ -72,7 +74,7 @@ impl ReadFrameProcessorActorState
 
     }
 
-    impl_default_beginning_and_ending_async!();
+    impl_default_start_and_end_async!();
 
     //impl_default_on_enter_async!();
 
@@ -129,4 +131,6 @@ impl ReadFrameProcessorActorState
 
 }
 
-impl_mac_task_actor!(ReadFrameProcessorActorState, ReadFrameProcessorActor);
+//impl_mac_task_actor!(ReadFrameProcessorActorState, ReadFrameProcessorActor);
+
+impl_mac_task_actor!(ReadFrameProcessorActor);

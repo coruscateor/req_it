@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use act_rs::{impl_default_beginning_and_ending_async, impl_default_beginning_async, impl_default_ending_async, impl_mac_task_actor, tokio::io::mpsc::ActorIOClient, ActorFrontend};
+use act_rs::{impl_default_start_and_end_async, impl_default_start_async, impl_default_end_async, impl_mac_task_actor, tokio::io::mpsc::ActorIOClient, ActorFrontend};
 
 use corlib::{impl_get_ref};
 
@@ -9,6 +9,8 @@ use fastwebsockets::{OpCode, Payload};
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
 use tokio::task::JoinHandle;
+
+use paste::paste;
 
 use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorOutputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
 
@@ -123,7 +125,7 @@ impl WriteFrameProcessorActorState
 
     }
 
-    impl_default_beginning_and_ending_async!();
+    impl_default_start_and_end_async!();
 
     //impl_default_on_enter_async!();
 
@@ -148,6 +150,8 @@ impl WriteFrameProcessorActorState
 
                         of.opcode = OpCode::Text;
 
+                        //Set the payload of the OwnedFrame the right size.
+
                         let content_bytes = contents.as_bytes();
 
                         let payload = &mut of.payload;
@@ -161,9 +165,16 @@ impl WriteFrameProcessorActorState
 
                         }
 
+                        //Copy the bytes into the OwnedFrame payload. 
+
                         payload.copy_from_slice(content_bytes);
 
-                        self.web_socket_actor_io_client.input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await.unwrap();
+                        if let Err(_) = self.web_socket_actor_io_client.input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await
+                        {
+
+                            return false;
+
+                        }
 
                     },
 
@@ -192,4 +203,4 @@ within `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src
 
  */
 
-impl_mac_task_actor!(WriteFrameProcessorActorState, WriteFrameProcessorActor);
+impl_mac_task_actor!(WriteFrameProcessorActor);
