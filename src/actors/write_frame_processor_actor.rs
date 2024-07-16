@@ -132,65 +132,56 @@ impl WriteFrameProcessorActorState
     async fn run_async(&mut self) -> bool
     {
 
-        match self.input_receiver.recv().await
+        if let Some(message) = self.input_receiver.recv().await
         {
 
-            Some(message) =>
+            match message
             {
 
-                match message
+                WriteFrameProcessorActorInputMessage::Process(contents) =>
                 {
 
-                    WriteFrameProcessorActorInputMessage::Process(contents) =>
+                    //Get from cache...
+
+                    let mut of = OwnedFrame::new();
+
+                    of.opcode = OpCode::Text;
+
+                    //Set the payload of the OwnedFrame the right size.
+
+                    let content_bytes = contents.as_bytes();
+
+                    let payload = &mut of.payload;
+                    
+                    let cb_len = content_bytes.len();
+
+                    if cb_len != payload.len()
                     {
 
-                        //Get from cache...
+                        payload.resize(cb_len, 0);
 
-                        let mut of = OwnedFrame::new();
+                    }
 
-                        of.opcode = OpCode::Text;
+                    //Copy the bytes into the OwnedFrame payload. 
 
-                        //Set the payload of the OwnedFrame the right size.
+                    payload.copy_from_slice(content_bytes);
 
-                        let content_bytes = contents.as_bytes();
+                    if let Err(_) = self.web_socket_actor_io_client.input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await
+                    {
 
-                        let payload = &mut of.payload;
-                        
-                        let cb_len = content_bytes.len();
+                        return false;
 
-                        if cb_len != payload.len()
-                        {
-
-                            payload.resize(cb_len, 0);
-
-                        }
-
-                        //Copy the bytes into the OwnedFrame payload. 
-
-                        payload.copy_from_slice(content_bytes);
-
-                        if let Err(_) = self.web_socket_actor_io_client.input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await
-                        {
-
-                            return false;
-
-                        }
-
-                    },
+                    }
 
                 }
 
-            },
-            None =>
-            {
-
-                return false;
-
             }
-            
+
+            return true;
+
         }
 
-        true
+        false
 
     }
 
