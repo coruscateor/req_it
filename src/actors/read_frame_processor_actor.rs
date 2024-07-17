@@ -6,7 +6,7 @@ use tokio::sync::mpsc::{Sender, Receiver, channel};
 
 use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorOutputMessage};
 
-use std::sync::{Arc, Mutex};
+use std::{rc::Rc, sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}};
 
 use act_rs::ActorFrontend;
 
@@ -27,14 +27,15 @@ pub struct ReadFrameProcessorActorState
     */
 
     //io_client: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //Should really only be on the "client side".
-    io_server: ActorIOServer<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
+    io_server: ActorIOServer<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
+    in_the_read_pipeline_count: Arc<AtomicUsize>
 
 }
 
 impl ReadFrameProcessorActorState
 {
 
-    pub fn new() -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(in_the_read_pipeline_count: &Arc<AtomicUsize>) -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         /*
@@ -57,16 +58,17 @@ impl ReadFrameProcessorActorState
         {
 
             //io_client,
-            io_server
+            io_server,
+            in_the_read_pipeline_count: in_the_read_pipeline_count.clone()
 
         })
 
     }
 
-    pub fn spawn() -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
+    pub fn spawn(in_the_read_pipeline_count: &Arc<AtomicUsize>) -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
     {
 
-        let (io_client, state) = ReadFrameProcessorActorState::new();
+        let (io_client, state) = ReadFrameProcessorActorState::new(in_the_read_pipeline_count);
 
         ReadFrameProcessorActor::spawn(state);
 
@@ -120,6 +122,8 @@ impl ReadFrameProcessorActorState
             }
 
             let _ = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await; //.unwrap();
+
+            self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
 
             return true;
 

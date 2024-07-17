@@ -4,7 +4,7 @@ use std::rc::{Weak, Rc};
 
 use std::any::Any;
 
-use std::sync::mpsc::TryRecvError;
+//use std::sync::mpsc::TryRecvError;
 
 use std::sync::OnceLock;
 
@@ -16,7 +16,7 @@ use gtk_estate::adw::glib::clone::Upgrade;
 
 //use gtk_estate::corlib::upgrading::up_rc;
 
-use corlib::upgrading::up_rc;
+use corlib::upgrading::{up_rc, up_rc_pt};
 
 use gtk_estate::gtk4::ListBox;
 
@@ -70,7 +70,9 @@ use gtk::glib;
 
 use gtk::glib::clone;
 
-type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
+use tokio::sync::mpsc::error::TryRecvError;
+
+//type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
 
 //static FORMAT_DROPDOWN_STRS: [&str] = ["JSON To CBOR", "Text"];
 
@@ -131,6 +133,7 @@ pub struct WebSocketTabState
 
     address_text: Text,
     connect_button: Button,
+    disconnect_button: Button,
     time_output_label: Label,
     //["JSON To CBOR", "Text"]
     //format_dropdown: [&str],
@@ -248,6 +251,10 @@ impl WebSocketTabState
         let connect_button = Button::builder().label("Connect").build();
 
         tool_center_box.append(&connect_button);
+
+        let disconnect_button = Button::builder().label("Disconnect").visible(false).build();
+
+        tool_center_box.append(&disconnect_button);
 
         tool_cbox.set_center_widget(Some(&tool_center_box));
 
@@ -448,6 +455,7 @@ impl WebSocketTabState
 
                 address_text,
                 connect_button,
+                disconnect_button,
                 time_output_label,
                 format_dropdown,
                 send_button,
@@ -500,14 +508,25 @@ impl WebSocketTabState
 
         let weak_self = this.adapted_contents_box.weak_parent();
 
-        this.connect_button.connect_clicked(move |_btn|
+        this.connect_button.connect_clicked(move |btn|
         {
 
             up_rc(&weak_self, |this|
             {
 
+                btn.set_sensitive(false);
+
                 borrow_mut(&this.mut_state, |mut mut_state|
                 {
+
+                    //Return if we're already connected.
+
+                    if this.web_socket_actor_poller.is_active()
+                    {
+
+                        return;
+
+                    }
 
                     let address = this.address_text.text().to_string();
 
@@ -523,7 +542,7 @@ impl WebSocketTabState
                         web_socket_tab_state.rs(498, 70): consider removing this method call, as the receiver has type `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>` and `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>: std::fmt::Debug` trivially holds
                      */
 
-                    if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_actor_io_client().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //web_socket_actor.interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address))
+                    if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_actor_io_client().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //web_socket_actor.interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address))
                     {
 
                         //Error: Counld not contact web_socket_actor.
@@ -538,14 +557,102 @@ impl WebSocketTabState
             
         });
 
+        let weak_self = this.adapted_contents_box.weak_parent();
+
+        this.disconnect_button.connect_clicked(move |btn|
+        {
+
+            //Disconnect from the server.
+        
+            up_rc(&weak_self, |this|
+            {
+
+                btn.set_visible(false);
+
+                if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_actor_io_client().input_sender().try_send(WebSocketActorInputMessage::Disconnect)
+                {
+
+                    //Error: Counld not contact web_socket_actor.
+
+                }
+                else
+                {
+
+                    let connect_button = &this.connect_button;
+                    
+                    connect_button.set_sensitive(true);
+                    
+                    connect_button.set_visible(true);
+
+                }
+
+            });
+
+        });
+
         //TimeOut
 
         this.web_socket_actor_poller.set_on_time_out_fn(move |sto|
         {
 
-            up_rc(sto.state(), |this|
+            up_rc_pt(sto.state(), |this|
             {
 
+                let mut receiver = this.write_frame_processor_actor_io_client.read_frame_actor_io_client().output_receiver_lock().expect("Error: read_frame_actor_io_client().output_receiver_lock() panicked");
+
+                match receiver.try_recv()
+                {
+
+                    Ok(res) =>
+                    {
+
+                        //res.
+
+                    },
+                    Err(err) =>
+                    {
+
+                        match err
+                        {
+
+                            TryRecvError::Empty =>
+                            {
+
+                                //Are read frames being processed?
+
+                                if this.write_frame_processor_actor_io_client.is_processing_read_frames()
+                                {
+
+                                    return true;
+
+                                }
+
+                                //Is disconnected?
+
+                                if this.connect_button.is_visible()
+                                {
+
+                                    return false;
+
+                                }
+
+                            },
+                            TryRecvError::Disconnected =>
+                            {
+
+                                panic!("Error: The Read Frame Actor is non-functional");
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                true
+
+                /*
                 borrow_mut(&this.mut_state,|mut mut_state|
                 {
 
@@ -561,7 +668,8 @@ impl WebSocketTabState
 
                     false
 
-                });
+                })
+                */
                 
             })
 

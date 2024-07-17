@@ -24,6 +24,7 @@ use tokio::{sync::mpsc::Receiver, runtime::Handle};
 
 use std::future::Future;
 
+use std::sync::atomic::AtomicUsize;
 use std::{marker::PhantomData, sync::Arc};
 
 use tokio::runtime::Runtime;
@@ -53,6 +54,8 @@ use crate::actors::{OwnedFrame, ReadFrameProcessorActorInputMessage, WebSocketAc
 use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
 use paste::paste;
+
+use std::sync::atomic::Ordering;
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
@@ -233,15 +236,16 @@ pub struct WebSocketActorState
     current_connection: Option<CurrentConnection>, //web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
     url: Option<String>,
     //temp_frame: Frame<'_>
-    read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage> //ReadFrameProcessorActor,
+    read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //ReadFrameProcessorActor,
     //read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage> //Next stage input sender
+    in_the_read_pipeline_count: Arc<AtomicUsize>
 
 }
 
 impl WebSocketActorState
 {
 
-    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>) -> (ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> (ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         //let (sender_input, reciver_input) = channel(50);
@@ -261,16 +265,17 @@ impl WebSocketActorState
             url: None,
             //read_frame_processor_actor, //: ReadFrameProcessorActor::new(state)
             //read_frame_proccessor_input_sender
-            read_frame_processor_actor_io
+            read_frame_processor_actor_io,
+            in_the_read_pipeline_count: in_the_read_pipeline_count.clone()
 
         })
 
     }
 
-    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>) -> ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
+    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
     {
 
-        let (io_client, state) = WebSocketActorState::new(read_frame_processor_actor_io);
+        let (io_client, state) = WebSocketActorState::new(read_frame_processor_actor_io, in_the_read_pipeline_count);
 
         WebSocketActor::spawn(state);
 
@@ -632,6 +637,8 @@ impl WebSocketActorState
 
                                 }
 
+                                //Cache owned_frame...
+
                             }                
                 
                         }
@@ -656,13 +663,15 @@ impl WebSocketActorState
                         Ok(frame) =>
                         {
 
+                            self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
+
                             //Get from cache...
 
                             let mut of = OwnedFrame::new();
 
                             of.copy_from_read_frame(&frame);
 
-                            self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await.unwrap(); //read_frame_proccessor_input_sender.send(ReadFrameProcessorActorInputMessage::Frame(of)).await.unwrap();
+                            let _ = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await; //read_frame_proccessor_input_sender.send(ReadFrameProcessorActorInputMessage::Frame(of)).await.unwrap();
 
                         },
                         Err(err) =>
