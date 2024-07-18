@@ -14,7 +14,9 @@ use tokio::task::JoinHandle;
 
 use paste::paste;
 
-use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorOutputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
+use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
+
+//WebSocketActorOutputMessage,
 
 use super::OwnedFrame;
 
@@ -23,7 +25,8 @@ pub struct WriteFrameProcessorActorIOClient
 {
 
     sender: Sender<WriteFrameProcessorActorInputMessage>,
-    web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>,
+    web_socket_input_sender: Sender<WebSocketActorInputMessage>,
+    //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>,
     //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
     read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
     in_the_read_pipeline_count: Arc<AtomicUsize>
@@ -33,15 +36,16 @@ pub struct WriteFrameProcessorActorIOClient
 impl WriteFrameProcessorActorIOClient
 {
 
-    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
+    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_input_sender: Sender<WebSocketActorInputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
     {
 
         Self
         {
 
             sender,
-            web_socket_actor_io_client,
+            //web_socket_actor_io_client,
             //read_frame_proccessor_output_receiver //: Arc::new(Mutex::new(read_frame_proccessor_output_receiver))
+            web_socket_input_sender,
             read_frame_actor_io_client,
             in_the_read_pipeline_count //: in_the_read_pipeline_count.clone()
 
@@ -51,9 +55,11 @@ impl WriteFrameProcessorActorIOClient
 
     impl_get_ref!(sender, Sender<WriteFrameProcessorActorInputMessage>);
 
-    impl_get_ref!(web_socket_actor_io_client, ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>);
+    //impl_get_ref!(web_socket_actor_io_client, ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>);
 
     //impl_get_ref!(read_frame_proccessor_output_receiver, Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>);
+
+    impl_get_ref!(web_socket_input_sender, Sender<WebSocketActorInputMessage>);
 
     impl_get_ref!(read_frame_actor_io_client, ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>);
 
@@ -88,8 +94,9 @@ pub struct WriteFrameProcessorActorState
     //input_sender: Sender<WriteFrameProcessorActorInputMessage>,
     input_receiver: Receiver<WriteFrameProcessorActorInputMessage>, 
     //client_sender_ouput: Sender<WebSocketActorOutputMessage>
-    web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage> //WebSocketActor,
+    //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage> //WebSocketActor,
     //actor_io_client: WriteFrameProcessorActorIOClent
+    web_socket_input_sender: Sender<WebSocketActorInputMessage>
 }
 
 impl WriteFrameProcessorActorState
@@ -108,15 +115,25 @@ impl WriteFrameProcessorActorState
 
         let in_the_read_pipeline_count = Arc::new(AtomicUsize::new(0));
 
+        //Last Stage
+
         let read_frame_processor_actor_io_client = ReadFrameProcessorActorState::spawn(&in_the_read_pipeline_count); //read_frame_proccessor_input_receiver));
 
         //let read_frame_proccessor_output_receiver = read_frame_processor_actor.interactor().clone();
 
         //let read_frame_processor_actor_interactor = read_frame_processor_actor.interactor().clone();
 
-        let web_socket_actor_io_client = WebSocketActorState::spawn(read_frame_processor_actor_io_client.clone(), &in_the_read_pipeline_count); //WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor)); //, read_frame_proccessor_input_sender));
+        //Second Stage
 
-        let actor_io_client = WriteFrameProcessorActorIOClient::new(sender, web_socket_actor_io_client.clone(), read_frame_processor_actor_io_client, in_the_read_pipeline_count); //read_frame_processor_actor_interactor); //read_frame_proccessor_output_receiver);
+        let web_socket_input_sender= WebSocketActorState::spawn(read_frame_processor_actor_io_client.clone(), &in_the_read_pipeline_count); //WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor)); 
+
+        //let web_socket_actor_io_client = WebSocketActorState::spawn(read_frame_processor_actor_io_client.clone(), &in_the_read_pipeline_count); //WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor)); //, read_frame_proccessor_input_sender));
+
+        //First Stage
+
+        let actor_io_client = WriteFrameProcessorActorIOClient::new(sender, web_socket_input_sender.clone(), read_frame_processor_actor_io_client, in_the_read_pipeline_count); //read_frame_processor_actor_interactor); //read_frame_proccessor_output_receiver);
+
+        //web_socket_actor_io_client.clone(),
 
         (actor_io_client,
         Self
@@ -125,8 +142,9 @@ impl WriteFrameProcessorActorState
             //input_sender: sender,
             input_receiver: receiver,
             //client_sender_ouput
-            web_socket_actor_io_client
+            //web_socket_actor_io_client
             //actor_io_client
+            web_socket_input_sender
 
         })
 
@@ -184,7 +202,7 @@ impl WriteFrameProcessorActorState
 
                     payload.copy_from_slice(content_bytes);
 
-                    if let Err(_) = self.web_socket_actor_io_client.input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await
+                    if let Err(_) = self.web_socket_input_sender.send(WebSocketActorInputMessage::WriteFrame(of)).await //web_socket_actor_io_client.input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await
                     {
 
                         return false;

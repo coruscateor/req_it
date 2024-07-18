@@ -55,6 +55,7 @@ pub enum WebSocketActorOutputClientMessage
     ConnectionSucceed(MovableText),
     ConnectionFailed(MovableText),
     Disconnected(MovableText),
+    Disconnecting(MovableText),
     NotConnected(MovableText),
 
 }
@@ -93,6 +94,12 @@ impl AsStr for WebSocketActorOutputClientMessage
                 message.as_str()
 
             }
+            WebSocketActorOutputClientMessage::Disconnecting(message) =>
+            {
+
+                message.as_str()
+
+            }
 
         }
 
@@ -112,7 +119,7 @@ pub enum WebSocketActorOutputServerMessage
 }
 
 
-
+/*
 #[derive(Debug)]
 pub enum WebSocketActorOutputMessage
 {
@@ -121,6 +128,7 @@ pub enum WebSocketActorOutputMessage
     ServerMessage(WebSocketActorOutputServerMessage)
 
 }
+*/
 
 #[derive(Debug)]
 pub enum WriteFrameProcessorActorInputMessage
@@ -147,6 +155,7 @@ pub enum WriteFrameProcessorActorOutputMessage
 pub enum ReadFrameProcessorActorInputMessage
 {
 
+    ClientMessage(WebSocketActorOutputClientMessage),
     Frame(OwnedFrame) //Frame)
 
 }
@@ -155,6 +164,7 @@ pub enum ReadFrameProcessorActorInputMessage
 pub enum ReadFrameProcessorActorOutputMessage
 {
 
+    ClientMessage(WebSocketActorOutputClientMessage),
     Processed(String)
 
 }

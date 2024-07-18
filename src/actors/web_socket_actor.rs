@@ -4,7 +4,7 @@ use act_rs::{ActorFrontend, ActorState, impl_mac_task_actor, impl_default_start_
 
 use act_rs::tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io};
 
-use fastwebsockets::{handshake, FragmentCollector, Frame, WebSocket, WebSocketError};
+use fastwebsockets::{handshake, FragmentCollector, Frame, OpCode, WebSocket, WebSocketError};
 
 //use gtk_estate::corlib::MovableText;
 
@@ -18,7 +18,7 @@ use tokio::io::AsyncWriteExt;
 
 use tokio::select;
 
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{channel, Sender};
 
 use tokio::{sync::mpsc::Receiver, runtime::Handle};
 
@@ -51,7 +51,7 @@ use tokio::task::JoinHandle;
 
 use crate::actors::{OwnedFrame, ReadFrameProcessorActorInputMessage, WebSocketActorOutputServerMessage};
 
-use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
+use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
 use paste::paste;
 
@@ -64,6 +64,8 @@ static ERROR_EMPTY_URL_PROVIDED: &str = "Error: Empty URL provided";
 static SERVER_DISCONNECTED: &str = "Server disconnected";
 
 static ERROR_NO_SERVER_CONNECTED: &str = "Error: No server connected";
+
+static DISCONNECTION_FRAME_SENT: &str = "Disconnection Frame Sent";
 
 //static CONNECTION_FAILED: &str = "Connection Faild!";
 
@@ -230,8 +232,9 @@ impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
 pub struct WebSocketActorState
 {
 
+    input_receiver: Receiver<WebSocketActorInputMessage>,
     //sender_input: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Sender<WebSocketActorInputMessage>,
-    actor_io_server: ActorIOServer<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Receiver<WebSocketActorInputMessage>,
+    //actor_io_server: ActorIOServer<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Receiver<WebSocketActorInputMessage>,
     //connection_stream: Option<TcpStream>
     current_connection: Option<CurrentConnection>, //web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
     url: Option<String>,
@@ -245,21 +248,22 @@ pub struct WebSocketActorState
 impl WebSocketActorState
 {
 
-    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> (ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> (Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
-        //let (sender_input, reciver_input) = channel(50);
+        let (input_sender, input_receiver) = channel(50);
 
         //let (sender_input, reciver_input) = tokio::sync::mpsc::channel(50);
 
-        let (actor_io_client, actor_io_server) = actor_io(10, 1000);
+       // let (actor_io_client, actor_io_server) = actor_io(10, 1000);
 
-        (actor_io_client,
+        //(actor_io_client,
+        (input_sender,
         Self
         {
 
-            //sender_input,
-            actor_io_server,
+            input_receiver,
+            //actor_io_server,
             //web_socket: None,
             current_connection: None,
             url: None,
@@ -272,14 +276,18 @@ impl WebSocketActorState
 
     }
 
-    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
+    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> Sender<WebSocketActorInputMessage> //ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
     {
 
-        let (io_client, state) = WebSocketActorState::new(read_frame_processor_actor_io, in_the_read_pipeline_count);
+        //let (io_client, state) = WebSocketActorState::new(read_frame_processor_actor_io, in_the_read_pipeline_count);
+
+        let (sender, state) = WebSocketActorState::new(read_frame_processor_actor_io, in_the_read_pipeline_count);
 
         WebSocketActor::spawn(state);
 
-        io_client
+        //io_client
+
+        sender
 
     }
 
@@ -294,7 +302,7 @@ impl WebSocketActorState
     async fn run_async(&mut self) -> bool
     {
 
-        if let Some(message) = self.actor_io_server.input_receiver().recv().await
+        if let Some(message) = self.input_receiver.recv().await //actor_io_server.input_receiver().recv().await
         {
 
             if self.process_received_actor_input_message(message).await
@@ -358,6 +366,9 @@ impl WebSocketActorState
 
     }
 
+    ///
+    /// Shuts down and drops the connection. The WebSocket connection closure process should've been comnpleted by this point.
+    /// 
     async fn disconnect_from_server(&mut self) -> Option<ConnectedLoopExitReason>
     {
 
@@ -379,7 +390,7 @@ impl WebSocketActorState
 
                 self.url = None;
 
-                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
+                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
                 {
 
                     return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
@@ -403,7 +414,7 @@ impl WebSocketActorState
         if url.is_empty()
         {
 
-            if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::Str(ERROR_EMPTY_URL_PROVIDED)))).await
+            if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::Str(ERROR_EMPTY_URL_PROVIDED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::Str(ERROR_EMPTY_URL_PROVIDED)))).await
             {
 
                 return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
@@ -466,7 +477,7 @@ impl WebSocketActorState
 
                 //Connected!
 
-                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await
+                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await
                 {
 
                     //return false;
@@ -485,7 +496,7 @@ impl WebSocketActorState
 
                 //Send Error message to the actor-client
 
-                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await
+                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await
                 {
 
                     return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
@@ -527,7 +538,7 @@ impl WebSocketActorState
             WebSocketActorInputMessage::Disconnect =>
             {
 
-                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
+                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
                 {
 
                     return false;
@@ -540,7 +551,7 @@ impl WebSocketActorState
             WebSocketActorInputMessage::WriteFrame(_owned_frame) =>
             {
 
-                if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
+                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
                 {
 
                     return false;
@@ -602,7 +613,7 @@ impl WebSocketActorState
 
             select! {
 
-                res = self.actor_io_server.input_receiver().recv() =>
+                res = self.input_receiver.recv() => //.actor_io_server.input_receiver().recv() =>
                 {
 
                     if let Some(message) = res
@@ -620,8 +631,12 @@ impl WebSocketActorState
                             WebSocketActorInputMessage::Disconnect =>
                             {
         
-                                return Self::continue_or_not(self.disconnect_from_server().await);
+                                //Is Disconnecting...
+
+                                //return Self::continue_or_not(self.disconnect_from_server().await);
         
+                                return self.initiate_disconnection(ws).await;
+
                             }
                             WebSocketActorInputMessage::WriteFrame(mut owned_frame) =>
                             {
@@ -662,6 +677,24 @@ impl WebSocketActorState
 
                         Ok(frame) =>
                         {
+
+                            if frame.opcode == OpCode::Close
+                            {
+
+                                //The close frame should've already been send by the current WebSocket<TokioIo<Upgraded>> instance.
+
+                                /*
+                                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
+                                {
+
+                                    return false;
+
+                                }
+                                */
+
+                                return Self::continue_or_not(self.disconnect_from_server().await); //true;
+
+                            }
 
                             self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
 
@@ -727,10 +760,26 @@ impl WebSocketActorState
 
     }
 
+    async fn initiate_disconnection(&mut self, current_connection: &mut CurrentConnection) -> bool
+    {
+
+        let _ = current_connection.write_frame(Frame::close_raw(vec![].into()));
+
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnecting(MovableText::Str(DISCONNECTION_FRAME_SENT)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await
+        {
+
+            return false;
+
+        }
+
+        true
+
+    }
+
     async fn on_web_socket_error(&mut self, error: WebSocketError) -> Option<ConnectedLoopExitReason>
     {
 
-        if let Err(_) = self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(error.to_string())))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await
         {
 
             return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
