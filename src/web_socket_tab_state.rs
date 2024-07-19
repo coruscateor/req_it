@@ -99,11 +99,15 @@ fn format_dropdown_strs() -> &'static [&'static str]
 
 //static FORMAT_DROPDOWN_STRS: &'static [&str] = ["JSON To CBOR", "Text"];
 
-static FORMAT_DROPDOWN_STRS: &[&str] = &["JSON To CBOR", "Text"];
+//static FORMAT_DROPDOWN_STRS: &[&str] = &["JSON To CBOR", "Text"];
 
-static JSON_TO_CBOR: &str = "JSON To CBOR";
+//static FORMAT_DROPDOWN_STRS: &[&str] = &["Text"];
+
+//static JSON_TO_CBOR: &str = "JSON To CBOR";
 
 static TEXT: &str = "Text";
+
+static FORMAT_DROPDOWN_STRS: &[&str] = &[TEXT];
 
 struct MutState
 {
@@ -734,6 +738,14 @@ impl WebSocketTabState
                                             connect_button.set_visible(true);
 
                                         }
+
+                                    }
+                                    WebSocketActorOutputClientMessage::Disconnecting(message) =>
+                                    {
+
+                                        this.output_message(message.as_str());
+
+                                        this.disconnect_button.set_sensitive(false);
 
                                     }
 

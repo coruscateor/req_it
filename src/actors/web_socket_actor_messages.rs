@@ -169,4 +169,18 @@ pub enum ReadFrameProcessorActorOutputMessage
 
 }
 
+//The current WebSocket client state for both actor and GUI states.
+
+#[derive(Debug, Default, Eq, PartialEq)]
+pub enum WebSocketConnectionState
+{
+
+    #[default]
+    NotConnected,
+    Connecting,
+    Connected,
+    Disconnecting
+
+}
+
 

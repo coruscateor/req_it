@@ -10,6 +10,8 @@ use fastwebsockets::{handshake, FragmentCollector, Frame, OpCode, WebSocket, Web
 
 use corlib::text::MovableText;
 
+//use http_body_util::combinators::Frame;
+
 use hyper::body::Incoming;
 
 use hyper::Response;
@@ -22,6 +24,7 @@ use tokio::sync::mpsc::{channel, Sender};
 
 use tokio::{sync::mpsc::Receiver, runtime::Handle};
 
+use std::cell::RefCell;
 use std::future::Future;
 
 use std::sync::atomic::AtomicUsize;
@@ -51,7 +54,7 @@ use tokio::task::JoinHandle;
 
 use crate::actors::{OwnedFrame, ReadFrameProcessorActorInputMessage, WebSocketActorOutputServerMessage};
 
-use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
+use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketConnectionState}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
 use paste::paste;
 
@@ -205,6 +208,49 @@ impl ConnectedLoopExitReason
 
 }
 
+/*
+struct MutState
+{
+
+    pub current_connection: Option<CurrentConnection>
+
+}
+
+impl MutState
+{
+
+    pub fn new() -> Self
+    {
+
+        Self
+        {
+
+            current_connection: None
+
+        }
+
+    }
+
+    pub fn new_rfc() -> RefCell<Self>
+    {
+
+        RefCell::new(Self::new())
+
+    }
+
+}
+*/
+
+enum ConnectedLoopNextMove<'f>
+{
+
+    PrepareForNewConnectionAndConnect(String),
+    DisconnectFromServer,
+    WriteFrame(OwnedFrame),
+    OnWebSocketError(WebSocketError),
+    ProcessFrame(Frame<'f>)
+}
+
 struct SpawnExecutor;
 
 impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
@@ -235,13 +281,16 @@ pub struct WebSocketActorState
     input_receiver: Receiver<WebSocketActorInputMessage>,
     //sender_input: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Sender<WebSocketActorInputMessage>,
     //actor_io_server: ActorIOServer<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Receiver<WebSocketActorInputMessage>,
-    //connection_stream: Option<TcpStream>
-    current_connection: Option<CurrentConnection>, //web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
+    //connection_stream: Option<TcpStream>,
+    current_connection: Option<CurrentConnection>, 
+    //current_connection: RefCell<Option<CurrentConnection>>, //The reference borrowing with this object has been troublesome... //web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
     url: Option<String>,
     //temp_frame: Frame<'_>
     read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //ReadFrameProcessorActor,
     //read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage> //Next stage input sender
-    in_the_read_pipeline_count: Arc<AtomicUsize>
+    in_the_read_pipeline_count: Arc<AtomicUsize>,
+    current_state: WebSocketConnectionState,
+    //mut_state: RefCell<MutState>
 
 }
 
@@ -266,11 +315,14 @@ impl WebSocketActorState
             //actor_io_server,
             //web_socket: None,
             current_connection: None,
+            //current_connection: RefCell::new(None),
             url: None,
             //read_frame_processor_actor, //: ReadFrameProcessorActor::new(state)
             //read_frame_proccessor_input_sender
             read_frame_processor_actor_io,
-            in_the_read_pipeline_count: in_the_read_pipeline_count.clone()
+            in_the_read_pipeline_count: in_the_read_pipeline_count.clone(),
+            current_state: WebSocketConnectionState::default(),
+            //mut_state: MutState::new_rfc()
 
         })
 
@@ -369,6 +421,8 @@ impl WebSocketActorState
     ///
     /// Shuts down and drops the connection. The WebSocket connection closure process should've been comnpleted by this point.
     /// 
+    /// Does NOT handle the WebSockets disconnection procedure.
+    /// 
     async fn disconnect_from_server(&mut self) -> Option<ConnectedLoopExitReason>
     {
 
@@ -390,6 +444,8 @@ impl WebSocketActorState
 
                 self.url = None;
 
+                self.current_state = WebSocketConnectionState::NotConnected;
+
                 if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
                 {
 
@@ -409,6 +465,8 @@ impl WebSocketActorState
     async fn prepare_for_new_connection_and_connect(&mut self, url: String) -> Option<ConnectedLoopExitReason> //bool
     {
 
+        //mut 
+
         //Check if a zero length string has been provided for the connection URL.
 
         if url.is_empty()
@@ -423,20 +481,138 @@ impl WebSocketActorState
 
             //return false;
 
+            self.current_state = WebSocketConnectionState::NotConnected;
+
             return Some(ConnectedLoopExitReason::InvalidInput);
 
         }
 
         //Disconnet from current server.
 
-        let res = self.disconnect_from_server().await;
-
-        if res.is_some()
+        if self.current_state == WebSocketConnectionState::Connected
         {
 
-            return res;
+            //loop
+            //{
+
+                let res: Result<Frame, WebSocketError>;
+
+                {
+
+                    self.current_state = WebSocketConnectionState::Disconnecting;
+
+                    //let ws = self.current_connection.as_mut().unwrap();
+
+                    if let Some(ws) = self.current_connection.as_mut()
+                    {
+
+                        if let Err(_res) = ws.write_frame(Frame::close_raw(vec![].into())).await
+                        {
+    
+                            self.current_state = WebSocketConnectionState::NotConnected;
+    
+                        }
+    
+                       //if self.current_state == WebSocketConnectionState::Disconnecting
+                       //{
+    
+                        res = ws.read_frame().await;
+
+                    }
+                    else {
+                        
+                        panic!("etc");
+
+                    }
+
+
+
+                        /*
+                        let res = ws.read_frame().await;
+
+                        match res
+                        {
+            
+                            Ok(frame) =>
+                            {
+            
+                                if frame.opcode == OpCode::Close
+                                {
+            
+                                }
+
+                                /*
+                                if Self::continue_or_not(self.process_frame(frame).await)
+                                {
+
+
+
+                                }
+                                */
+            
+                            }
+                            Err(_err) =>
+                            {
+
+                                self.current_state = WebSocketConnectionState::NotConnected;
+
+                            }
+
+                        }
+                        */
+
+                    //}
+
+                }
+
+                /*
+                cannot borrow `*self` as mutable more than once at a time
+                second mutable borrow occurs hererustcClick for full compiler diagnostic
+                web_socket_actor.rs(504, 30): first mutable borrow occurs here
+                web_socket_actor.rs(564, 73): first borrow later used here
+                 */
+
+                {
+
+                    match res
+                    {
+
+                        Ok(frame) =>
+                        {
+
+                            if Self::continue_or_not(self.process_frame(frame).await)
+                            {
+
+
+
+                            }
+
+                        },
+                        Err(err) =>
+                        {
+
+
+
+                        }
+
+                    }
+
+                }
+
+            //}
+
+            let res = self.disconnect_from_server().await;
+
+            if res.is_some()
+            {
+    
+                return res;
+    
+            }
 
         }
+
+        self.current_state = WebSocketConnectionState::Connecting;
 
         match self.connect_to_server(&url).await
         {
@@ -474,6 +650,8 @@ impl WebSocketActorState
                 //Do something with the connection response,
 
                 self.url = Some(url);
+
+                self.current_state = WebSocketConnectionState::Connected;
 
                 //Connected!
 
@@ -513,6 +691,10 @@ impl WebSocketActorState
 
         //false
 
+        //This worked...
+
+        //self.process_frame(Frame::close_raw(vec![].into())).await
+
         None
 
     }
@@ -521,6 +703,8 @@ impl WebSocketActorState
 
     async fn process_received_actor_input_message(&mut self, message: WebSocketActorInputMessage) -> bool
     {
+
+        //let mut_current_connection = self.current_connection.borrow_mut();
 
         //Not connected
 
@@ -606,157 +790,315 @@ impl WebSocketActorState
 
         //let ws = self.current_connection.as_mut().unwrap();
 
+        //let mut continue_or_not= true;
+
+        //let mut next_state: WebSocketConnectionState;
+
         loop
         {
 
-            let ws = self.current_connection.as_mut().unwrap();
+            let connected_loop_next_move: ConnectedLoopNextMove;
 
-            select! {
+            {
 
-                res = self.input_receiver.recv() => //.actor_io_server.input_receiver().recv() =>
-                {
+                let ws = self.current_connection.as_mut().unwrap();
 
-                    if let Some(message) = res
+                select! {
+
+                    res = self.input_receiver.recv() => //.actor_io_server.input_receiver().recv() =>
                     {
 
-                        match message
+                        if let Some(message) = res
                         {
-                
-                            WebSocketActorInputMessage::ConnectTo(url) =>
+
+                            match message
                             {
-                
-                                return Self::continue_or_not(self.prepare_for_new_connection_and_connect(url).await);
-                
+                    
+                                WebSocketActorInputMessage::ConnectTo(url) =>
+                                {
+                    
+                                    /*
+                                    continue_or_not = Self::continue_or_not(self.prepare_for_new_connection_and_connect(url).await);
+
+                                    if !continue_or_not
+                                    {
+
+                                        break;
+
+                                    }
+                                    */
+
+                                    connected_loop_next_move = ConnectedLoopNextMove::PrepareForNewConnectionAndConnect(url)
+                    
+                                }
+                                WebSocketActorInputMessage::Disconnect =>
+                                {
+            
+                                    //Is Disconnecting...
+
+                                    //return Self::continue_or_not(self.disconnect_from_server().await);
+            
+                                    //return true; //self.initiate_disconnection(ws).await;
+
+                                    //next_state = WebSocketConnectionState::Disconnecting;
+
+                                    //break;
+
+                                    connected_loop_next_move = ConnectedLoopNextMove::DisconnectFromServer;
+
+                                }
+                                WebSocketActorInputMessage::WriteFrame(owned_frame) =>
+                                {
+                    
+                                    //Write frame
+
+                                    /*
+                                    let frame = owned_frame.new_frame_to_be_written();
+
+                                    if let Err(err) = ws.write_frame(frame).await
+                                    {
+
+                                        return Self::continue_or_not(self.on_web_socket_error(err).await);
+
+                                    }
+                                    */
+
+                                    //Cache owned_frame...
+
+                                    connected_loop_next_move = ConnectedLoopNextMove::WriteFrame(owned_frame);
+
+                                }                
+                    
                             }
-                            WebSocketActorInputMessage::Disconnect =>
+
+                        }
+                        else
+                        {
+
+                            //ActorIOCleint input receiver has disconnected.
+
+                            return false;
+
+                        }
+
+                    },
+                    res = ws.read_frame() =>
+                    {
+
+                        match res
+                        {
+
+                            Ok(frame) =>
                             {
-        
-                                //Is Disconnecting...
 
-                                //return Self::continue_or_not(self.disconnect_from_server().await);
-        
-                                return self.initiate_disconnection(ws).await;
-
-                            }
-                            WebSocketActorInputMessage::WriteFrame(mut owned_frame) =>
-                            {
-                
-                                //Write frame
-
-                                let frame = owned_frame.new_frame_to_be_written();
-
-                                if let Err(err) = ws.write_frame(frame).await
+                                if frame.opcode == OpCode::Close
                                 {
 
-                                    return Self::continue_or_not(self.on_web_socket_error(err).await);
+                                    //The close frame should've already been send by the current WebSocket<TokioIo<Upgraded>> instance.
+
+                                    /*
+                                    if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
+                                    {
+
+                                        return false;
+
+                                    }
+                                    */
+
+                                    //return Self::continue_or_not(self.disconnect_from_server().await); //true;
+
+                                    connected_loop_next_move = ConnectedLoopNextMove::DisconnectFromServer;
+
+                                    //continue;
+
+                                }
+                                else
+                                {
+
+                                    /* 
+                                    self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
+
+                                    //Get from cache...
+
+                                    let mut of = OwnedFrame::new();
+
+                                    of.copy_from_read_frame(&frame);
+
+                                    let _ = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await; //read_frame_proccessor_input_sender.send(ReadFrameProcessorActorInputMessage::Frame(of)).await.unwrap();
+                                    */
+
+                                    //drop(ws);
+
+                                    //The borrow checker complained about "process_frame" before connection RefCell intallation.
+
+                                    /*
+
+                                    cannot borrow `*self` as immutable because it is also borrowed as mutable
+                                    immutable borrow occurs hererustcClick for full compiler diagnostic
+                                    web_socket_actor.rs(712, 22): mutable borrow occurs here
+                                    web_socket_actor.rs(827, 74): mutable borrow later used here
+
+                                    */
+
+                                    /*
+                                    if !Self::continue_or_not(self.process_frame(frame).await)
+                                    {
+
+                                        return false;
+
+                                    }
+                                    */
+
+                                    //self.process_frame2();
+
+                                    connected_loop_next_move = ConnectedLoopNextMove::ProcessFrame(frame);
 
                                 }
 
-                                //Cache owned_frame...
+                            },
+                            Err(err) =>
+                            {
 
-                            }                
-                
-                        }
+                                //Send Error
+
+                                //Disconnect
+
+                                //return Self::continue_or_not(self.on_web_socket_error(err).await);
+
+                                connected_loop_next_move = ConnectedLoopNextMove::OnWebSocketError(err);
+
+                            }
+
+                        }    
 
                     }
-                    else
-                    {
 
-                        //ActorIOCleint input receiver has disconnected.
+                }
+
+                //drop(ws);
+
+            }
+
+            match connected_loop_next_move 
+            {
+
+                ConnectedLoopNextMove::PrepareForNewConnectionAndConnect(url) =>
+                {
+
+                    if !Self::continue_or_not(self.prepare_for_new_connection_and_connect(url).await)
+                    {
 
                         return false;
 
                     }
 
                 },
-                res = ws.read_frame() =>
+                ConnectedLoopNextMove::DisconnectFromServer =>
                 {
 
-                    match res
+                    return Self::continue_or_not(self.disconnect_from_server().await);
+
+                },
+                ConnectedLoopNextMove::WriteFrame(mut owned_frame) =>
+                {
+
                     {
 
-                        Ok(frame) =>
+                        let ws2 = self.current_connection.as_mut().unwrap();
+
+                        let frame = owned_frame.new_frame_to_be_written();
+    
+                        if let Err(err) = ws2.write_frame(frame).await
                         {
-
-                            if frame.opcode == OpCode::Close
-                            {
-
-                                //The close frame should've already been send by the current WebSocket<TokioIo<Upgraded>> instance.
-
-                                /*
-                                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
-                                {
-
-                                    return false;
-
-                                }
-                                */
-
-                                return Self::continue_or_not(self.disconnect_from_server().await); //true;
-
-                            }
-
-                            self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
-
-                            //Get from cache...
-
-                            let mut of = OwnedFrame::new();
-
-                            of.copy_from_read_frame(&frame);
-
-                            let _ = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await; //read_frame_proccessor_input_sender.send(ReadFrameProcessorActorInputMessage::Frame(of)).await.unwrap();
-
-                        },
-                        Err(err) =>
-                        {
-
-                            //Send Error
-
-                            //Disconnect
-
+    
                             return Self::continue_or_not(self.on_web_socket_error(err).await);
-
+    
                         }
 
-                    }    
+                    }
 
-                }
-
-            }
-
-            /*
-            if let Some(message) = self.receiver_input.input_receiver().recv().await
-            {
-    
-                match message
+                },
+                ConnectedLoopNextMove::OnWebSocketError(error) =>
                 {
-        
-                    WebSocketActorInputMessage::ConnectTo(url) =>
+
+                    return Self::continue_or_not(self.on_web_socket_error(error).await);
+
+                },
+                ConnectedLoopNextMove::ProcessFrame(frame) =>
+                {
+
+                    /*
+                    cannot borrow `*self` as mutable more than once at a time
+                    second mutable borrow occurs hererustcClick for full compiler diagnostic
+                    web_socket_actor.rs(730, 26): first mutable borrow occurs here
+                    web_socket_actor.rs(954, 66): first borrow later used here
+                     */
+
+                    //I don't get this...
+
+                     /*
+                    if !Self::continue_or_not(self.process_frame(frame).await)
                     {
-        
-                        if !self.prepare_for_new_connection_and_connect(url).await
-                        {
-        
-                            return; // false;
-        
-                        }
-        
+
+                        return false;
+
                     }
-                    WebSocketActorInputMessage::Disconnect =>
+                    */
+
+                    self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
+
+                    //Get from cache...
+                    
+                    let mut of = OwnedFrame::new();
+            
+                    of.copy_from_read_frame(&frame);
+            
+                    if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await
                     {
-
-                        self.disconnect_from_server().await;
-
-                        return;
+            
+                        //return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+            
+                        return false;
 
                     }
-        
+            
+
                 }
-    
+
             }
-            */
 
         }
+
+        //continue_or_not
+
+    }
+
+    async fn process_frame<'f>(&'f mut self, frame: Frame<'f>) -> Option<ConnectedLoopExitReason> 
+    {
+
+        self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
+
+        //Get from cache...
+
+        let mut of = OwnedFrame::new();
+
+        of.copy_from_read_frame(&frame);
+
+        if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await
+        {
+
+            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+        }
+
+        None
+
+    }
+
+    async fn process_frame2(&mut self) -> Option<ConnectedLoopExitReason> 
+    {
+
+        None
 
     }
 
