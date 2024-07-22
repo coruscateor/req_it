@@ -1,4 +1,4 @@
-use act_rs::{ActorFrontend, ActorState, impl_mac_task_actor, impl_default_start_async, impl_default_end_async, impl_default_start_and_end_async};
+use act_rs::{impl_default_end_async, impl_default_start_and_end_async, impl_default_start_async, impl_mac_task_actor, impl_mac_task_actor_built_state, ActorFrontend, ActorState};
 
 //impl_mac_runtime_task_actor
 
@@ -59,6 +59,8 @@ use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, We
 use paste::paste;
 
 use std::sync::atomic::Ordering;
+
+use super::WebSocketActorStateBuilder;
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
@@ -241,14 +243,15 @@ impl MutState
 }
 */
 
-enum ConnectedLoopNextMove<'f>
+enum ConnectedLoopNextMove //<'f>
 {
 
     PrepareForNewConnectionAndConnect(String),
     DisconnectFromServer,
     WriteFrame(OwnedFrame),
     OnWebSocketError(WebSocketError),
-    ProcessFrame(Frame<'f>)
+    ProcessFrame(OwnedFrame) //(Frame<'f>)
+    
 }
 
 struct SpawnExecutor;
@@ -275,14 +278,16 @@ impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
 
 //WebSocketActors input queue/channel can be accessed via WriteFrameProcessorActors inter-actor directly, allowing it to be bypassed.
 
+//Time to put stuff in Mutexes.
+
 pub struct WebSocketActorState
 {
 
-    input_receiver: Receiver<WebSocketActorInputMessage>,
+    input_receiver: RefCell<Receiver<WebSocketActorInputMessage>>,
     //sender_input: ActorIOInteractorClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Sender<WebSocketActorInputMessage>,
     //actor_io_server: ActorIOServer<WebSocketActorInputMessage, WebSocketActorOutputMessage>, //Receiver<WebSocketActorInputMessage>,
     //connection_stream: Option<TcpStream>,
-    current_connection: Option<CurrentConnection>, 
+    current_connection: RefCell<Option<CurrentConnection>>, 
     //current_connection: RefCell<Option<CurrentConnection>>, //The reference borrowing with this object has been troublesome... //web_socket: Option<WebSocket<TokioIo<Upgraded>>>, //Option<Arc<WebSocket<TokioIo<Upgraded>>>>,
     url: Option<String>,
     //temp_frame: Frame<'_>
@@ -297,37 +302,39 @@ pub struct WebSocketActorState
 impl WebSocketActorState
 {
 
-    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> (Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>, input_receiver: Receiver<WebSocketActorInputMessage>) -> Self //(Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
-        let (input_sender, input_receiver) = channel(50);
+        //let (input_sender, input_receiver) = channel(50);
 
         //let (sender_input, reciver_input) = tokio::sync::mpsc::channel(50);
 
-       // let (actor_io_client, actor_io_server) = actor_io(10, 1000);
+        //let (actor_io_client, actor_io_server) = actor_io(10, 1000);
 
         //(actor_io_client,
-        (input_sender,
+        //(input_sender,
         Self
         {
 
-            input_receiver,
+            input_receiver: RefCell::new(input_receiver),
             //actor_io_server,
             //web_socket: None,
-            current_connection: None,
-            //current_connection: RefCell::new(None),
+            //current_connection: None,
+            current_connection: RefCell::new(None),
             url: None,
             //read_frame_processor_actor, //: ReadFrameProcessorActor::new(state)
             //read_frame_proccessor_input_sender
             read_frame_processor_actor_io,
-            in_the_read_pipeline_count: in_the_read_pipeline_count.clone(),
+            in_the_read_pipeline_count, //: in_the_read_pipeline_count.clone(),
             current_state: WebSocketConnectionState::default(),
             //mut_state: MutState::new_rfc()
 
-        })
+        }
+    //)
 
     }
 
+    /*
     pub fn spawn(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: &Arc<AtomicUsize>) -> Sender<WebSocketActorInputMessage> //ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
     {
 
@@ -342,6 +349,7 @@ impl WebSocketActorState
         sender
 
     }
+    */
 
     //Default on_enter_async and on_exit_async implementations.
 
@@ -354,7 +362,7 @@ impl WebSocketActorState
     async fn run_async(&mut self) -> bool
     {
 
-        if let Some(message) = self.input_receiver.recv().await //actor_io_server.input_receiver().recv().await
+        if let Some(message) = self.input_receiver_recv().await //self.input_receiver.recv().await //actor_io_server.input_receiver().recv().await
         {
 
             if self.process_received_actor_input_message(message).await
@@ -495,7 +503,7 @@ impl WebSocketActorState
             //loop
             //{
 
-                let res: Result<Frame, WebSocketError>;
+                let res: Result<OwnedFrame, WebSocketError>;
 
                 {
 
@@ -503,6 +511,16 @@ impl WebSocketActorState
 
                     //let ws = self.current_connection.as_mut().unwrap();
 
+                    if let Err(_res) = self.send_close_frame().await
+                    {
+
+                        self.current_state = WebSocketConnectionState::NotConnected;
+
+                    }
+
+                    res = self.read_frame().await;
+
+                    /*
                     if let Some(ws) = self.current_connection.as_mut()
                     {
 
@@ -516,7 +534,7 @@ impl WebSocketActorState
                        //if self.current_state == WebSocketConnectionState::Disconnecting
                        //{
     
-                        res = ws.read_frame().await;
+                        res = self.read_frame().await; //ws.read_frame().await;
 
                     }
                     else {
@@ -524,7 +542,7 @@ impl WebSocketActorState
                         panic!("etc");
 
                     }
-
+                    */
 
 
                         /*
@@ -645,7 +663,13 @@ impl WebSocketActorState
 
                 let connection = CurrentConnection::FragmentCollector(FragmentCollector::new(res.0));
 
-                self.current_connection = Some(connection);
+                {
+
+                    let mut current_connection_mut = self.current_connection.borrow_mut();
+
+                    *current_connection_mut = Some(connection);
+
+                }
 
                 //Do something with the connection response,
 
@@ -801,11 +825,11 @@ impl WebSocketActorState
 
             {
 
-                let ws = self.current_connection.as_mut().unwrap();
+                //let ws = self.current_connection.as_mut().unwrap();
 
                 select! {
 
-                    res = self.input_receiver.recv() => //.actor_io_server.input_receiver().recv() =>
+                    res = self.input_receiver_recv() => //self.input_receiver.recv() => //.actor_io_server.input_receiver().recv() =>
                     {
 
                         if let Some(message) = res
@@ -882,7 +906,7 @@ impl WebSocketActorState
                         }
 
                     },
-                    res = ws.read_frame() =>
+                    res = self.read_frame() => //ws.read_frame() =>
                     {
 
                         match res
@@ -1002,6 +1026,7 @@ impl WebSocketActorState
                 ConnectedLoopNextMove::WriteFrame(mut owned_frame) =>
                 {
 
+                    /*
                     {
 
                         let ws2 = self.current_connection.as_mut().unwrap();
@@ -1016,6 +1041,7 @@ impl WebSocketActorState
                         }
 
                     }
+                    */
 
                 },
                 ConnectedLoopNextMove::OnWebSocketError(error) =>
@@ -1045,15 +1071,15 @@ impl WebSocketActorState
                     }
                     */
 
-                    self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
+                    //self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
 
                     //Get from cache...
                     
-                    let mut of = OwnedFrame::new();
+                    //let mut of = OwnedFrame::new();
             
-                    of.copy_from_read_frame(&frame);
+                    //of.copy_from_read_frame(&frame);
             
-                    if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await
+                    if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(frame)).await
                     {
             
                         //return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
@@ -1073,6 +1099,79 @@ impl WebSocketActorState
 
     }
 
+    /*
+
+        error[E0499]: cannot borrow `*self` as mutable more than once at a time
+    --> src/actors/web_socket_actor.rs:583:54
+        |
+    506 |                     if let Some(ws) = self.current_connection.as_mut()
+        |                                       ----------------------- first mutable borrow occurs here
+    ...
+    583 |                             if Self::continue_or_not(self.process_frame(frame).await)
+        |                                                      ^^^^               ----- first borrow later used here
+        |                                                      |
+        |                                                      second mutable borrow occurs here
+     */
+
+    //Due to borrowing rule complications, frame reads and writes need to be isolated in their own methods (which is probably the better strategy anyway).
+
+    async fn read_frame(&self) -> Result<OwnedFrame, WebSocketError>
+    {
+
+        let mut current_connection_mut = self.current_connection.borrow_mut();
+
+        let frame = current_connection_mut.as_mut().expect("Error: No connection").read_frame().await?;
+
+        self.in_the_read_pipeline_count.fetch_add(1, Ordering::SeqCst);
+
+        //Get OwnedFrame from cache...
+
+        let mut of = OwnedFrame::new();
+
+        of.copy_from_read_frame(&frame);
+
+        Ok(of)
+
+    }
+
+    async fn write_frame(&self, mut of: OwnedFrame) -> Result<OwnedFrame, WebSocketError>
+    {
+
+        let frame = of.new_frame_to_be_written();
+
+        //self.current_connection.as_mut().expect("Error: No connection").write_frame(frame).await?;
+
+        self.current_connection.borrow_mut().as_mut().expect("Error: No connection").write_frame(frame).await?;
+
+        //Put OwnedFrame into cache...
+
+        //of...
+
+        Ok(of)
+
+    }
+
+    async fn input_receiver_recv(&self) -> Option<WebSocketActorInputMessage>
+    {
+
+        let mut recv_mut = self.input_receiver.borrow_mut(); //.await
+
+        recv_mut.recv().await
+
+    }
+
+    async fn send_close_frame(&self) -> Result<(), WebSocketError>
+    {
+
+        let mut current_connection_mut = self.current_connection.borrow_mut();
+
+        let current_connection = current_connection_mut.as_mut().expect("Error: No connection");
+
+        current_connection.write_frame(Frame::close_raw(vec![].into())).await
+
+    }
+
+    /*
     async fn process_frame<'f>(&'f mut self, frame: Frame<'f>) -> Option<ConnectedLoopExitReason> 
     {
 
@@ -1094,13 +1193,30 @@ impl WebSocketActorState
         None
 
     }
+    */
 
+    async fn process_frame(&mut self, of: OwnedFrame) -> Option<ConnectedLoopExitReason> 
+    {
+
+        if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await
+        {
+
+            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+        }
+
+        None
+
+    }
+
+    /*
     async fn process_frame2(&mut self) -> Option<ConnectedLoopExitReason> 
     {
 
         None
 
     }
+    */
 
     async fn initiate_disconnection(&mut self, current_connection: &mut CurrentConnection) -> bool
     {
@@ -1136,6 +1252,41 @@ impl WebSocketActorState
 
 //Setup the macro generated Task actor.
 
-impl_mac_task_actor!(WebSocketActor);
+//impl_mac_task_actor!(WebSocketActor);
+
+/*
+
+future cannot be sent between threads safely
+within `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:122:34: 126:22}`, the trait `Send` is not implemented for `NonNull<tokio::sync::mpsc::Receiver<web_socket_actor_messages::WebSocketActorInputMessage>>`, which is required by `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:122:34: 126:22}: Send`rustcClick for full compiler diagnostic
+mac_task_actor.rs(122, 21): Actual error occurred here
+web_socket_actor.rs(1156, 25): future is not `Send` as this value is used across an await
+spawn.rs(163, 21): required by a bound in `tokio::spawn`
+future cannot be sent between threads safely
+within `web_socket_actor::WebSocketActorState`, the trait `Sync` is not implemented for `RefCell<tokio::sync::mpsc::Receiver<web_socket_actor_messages::WebSocketActorInputMessage>>`, which is required by `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:122:34: 126:22}: Send`
+if you want to do aliasing and mutation between multiple threads, use `std::sync::RwLock` insteadrustcClick for full compiler diagnostic
+mac_task_actor.rs(122, 21): Actual error occurred here
+web_socket_actor.rs(1151, 34): captured value is not `Send` because `&` references cannot be sent unless their referent is `Sync`
+spawn.rs(163, 21): required by a bound in `tokio::spawn`
+future cannot be sent between threads safely
+within `web_socket_actor::WebSocketActorState`, the trait `Sync` is not implemented for `RefCell<std::option::Option<CurrentConnection>>`, which is required by `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:122:34: 126:22}: Send`
+if you want to do aliasing and mutation between multiple threads, use `std::sync::RwLock` insteadrustcClick for full compiler diagnostic
+mac_task_actor.rs(122, 21): Actual error occurred here
+web_socket_actor.rs(1151, 34): captured value is not `Send` because `&` references cannot be sent unless their referent is `Sync`
+spawn.rs(163, 21): required by a bound in `tokio::spawn`
+future cannot be sent between threads safely
+the trait `Sync` is not implemented for `std::cell::Cell<isize>`, which is required by `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:122:34: 126:22}: Send`
+if you want to do aliasing and mutation between multiple threads, use `std::sync::RwLock` or `std::sync::atomic::AtomicIsize` insteadrustcClick for full compiler diagnostic
+mac_task_actor.rs(122, 21): Actual error occurred here
+web_socket_actor.rs(1156, 25): future is not `Send` as this value is used across an await
+spawn.rs(163, 21): required by a bound in `tokio::spawn`
+future cannot be sent between threads safely
+within `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:122:34: 126:22}`, the trait `Send` is not implemented for `NonNull<std::option::Option<CurrentConnection>>`, which is required by `{async block@/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs/src/tokio/mac_task_actor.rs:122:34: 126:22}: Send`rustcClick for full compiler diagnostic
+mac_task_actor.rs(122, 21): Actual error occurred here
+web_socket_actor.rs(1120, 97): future is not `Send` as this value is used across an await
+spawn.rs(163, 21): required by a bound in `tokio::spawn`
+
+ */
+
+impl_mac_task_actor_built_state!(WebSocketActor);
 
 
