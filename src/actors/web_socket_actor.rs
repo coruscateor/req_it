@@ -53,7 +53,7 @@ use hyper_util::rt::TokioIo;
 
 use tokio::task::JoinHandle;
 
-use crate::actors::{OwnedFrame, ReadFrameProcessorActorInputMessage, WebSocketActorOutputServerMessage};
+use crate::actors::{OwnedFrame, ReadFrameProcessorActorInputMessage}; //, WebSocketActorOutputServerMessage};
 
 use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage, WebSocketConnectionState}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
@@ -67,15 +67,23 @@ use tokio::time::timeout_at;
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
-static ERROR_EMPTY_URL_PROVIDED: &str = "Error: Empty URL provided";
+static ERROR_EMPTY_URL_PROVIDED: &str = "Error: Empty URL provided.";
 
 static SERVER_DISCONNECTED: &str = "Server disconnected";
 
-static ERROR_NO_SERVER_CONNECTED: &str = "Error: No server connected";
+static ERROR_NO_SERVER_CONNECTED: &str = "Error: No server connected.";
 
-static DISCONNECTION_FRAME_SENT: &str = "Disconnection Frame Sent";
+static CLOSE_FRAME_SENT: &str = "Close frame Sent.";
 
 static TIME_ELAPSED_FORCED_CLOSURE_NOTICE: &str = "Close Connection Response Time Has Elapsed: Forcing closure of connection.";
+
+static SERVER_DISCONNECTION_FORCED: &str = "Forced server disconnection";
+
+static PING_RECEIVED: &str = "Ping frame received (pong frame automatically sent).";
+
+static PING_SENT: &str = "Ping frame sent.";
+
+static PONG_RECEIVED: &str = "Pong frame received.";
 
 //static CONNECTION_FAILED: &str = "Connection Faild!";
 
@@ -229,7 +237,8 @@ enum ConnectedLoopNextMove
     DisconnectFromServer,
     WriteFrame(OwnedFrame),
     OnWebSocketError(WebSocketError),
-    ProcessFrame(OwnedFrame)
+    ProcessFrame(OwnedFrame),
+    SendPing
     
 }
 
@@ -387,10 +396,17 @@ impl WebSocketActorState
     ///
     /// Shuts down and drops the connection. The WebSocket connection closure process should've been comnpleted by this point.
     /// 
-    async fn disconnect_from_server(&mut self, mut current_connection: CurrentConnection) -> Option<ConnectedLoopExitReason>
+    async fn disconnect_from_server(&mut self, mut current_connection: CurrentConnection, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
     {
 
-        //Send the disconnection frame
+        async fn shutdown(current_connection: CurrentConnection)
+        {
+
+            current_connection.shutdown().await.unwrap();
+
+        }
+
+        //If received_close_frame is true, send the close response frame, otherwise initiate connection closure process.
 
         if let Err(err) = self.send_close_frame(&mut current_connection).await
         {
@@ -400,83 +416,151 @@ impl WebSocketActorState
             if !Self::continue_or_not(&res)
             {
 
-                current_connection.shutdown().await.unwrap();
-    
+                shutdown(current_connection).await;
+
                 return res;
+
+            }
+
+        }
+        else
+        {
+
+            if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnecting(MovableText::Str(CLOSE_FRAME_SENT)))).await
+            {
+
+                shutdown(current_connection).await;
+    
+                return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
     
             }
 
         }
 
-        let now = Instant::now();
-
-        let soon = now.checked_add(Duration::from_secs(10)).expect("Error: Instant problems");
-
-        //Disconnection loop
-        
-        loop
+        if !received_close_frame
         {
+
+            //Send the disconnection frame
+
+            let now = Instant::now();
+
+            let soon = now.checked_add(Duration::from_secs(10)).expect("Error: Instant problems");
+
+            //Disconnection loop
             
-            match timeout_at(soon.clone(), Self::read_frame(&mut current_connection, &self.in_the_read_pipeline_count)).await
+            loop
             {
-
-                Ok(res) =>
+                
+                match timeout_at(soon.clone(), Self::read_frame(&mut current_connection, &self.in_the_read_pipeline_count)).await
                 {
-                    
-                    match res
-                    {
 
-                        Ok(frame) =>
+                    Ok(res) =>
+                    {
+                        
+                        match res
                         {
 
-                            if frame.opcode == OpCode::Close
+                            Ok(frame) =>
                             {
 
-                                //This ain't going down the pipleline.
+                                match frame.opcode
+                                {
 
-                                self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
+                                    OpCode::Close =>
+                                    {
 
-                                break;
-        
+                                        //This ain't going down the pipleline.
+
+                                        self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
+
+                                        break;
+
+                                    }
+                                    OpCode::Continuation | OpCode::Text | OpCode::Binary =>
+                                    {
+
+                                        if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(frame)).await
+                                        {
+                                
+                                            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+                    
+                                        }
+
+                                    }
+                                    OpCode::Ping =>
+                                    {
+
+                                        let res = self.report_ping_received().await;
+
+                                        if !Self::continue_or_not(&res)
+                                        {
+
+                                            shutdown(current_connection).await;
+
+                                            return res;
+
+                                        }
+
+                                    }
+                                    OpCode::Pong =>
+                                    {
+
+                                        let res = self.report_pong_received().await;
+
+                                        if !Self::continue_or_not(&res)
+                                        {
+
+                                            shutdown(current_connection).await;
+
+                                            return res;
+
+                                        }
+
+                                    }
+            
+                                }
+
+                            }
+                            Err(err) =>
+                            {
+
+                                let res = self.on_web_socket_error_report_only(err).await;
+
+                                if !Self::continue_or_not(&res)
+                                {
+
+                                    shutdown(current_connection).await;
+                        
+                                    return res;
+                        
+                                }
+
                             }
 
                         }
-                        Err(err) =>
+
+                    },
+                    Err(_err) =>
+                    {
+
+                        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(TIME_ELAPSED_FORCED_CLOSURE_NOTICE)))).await
                         {
 
-                            let res = self.on_web_socket_error_report_only(err).await;
-
-                            if !Self::continue_or_not(&res)
-                            {
-
-                                current_connection.shutdown().await.unwrap();
-                    
-                                return res;
-                    
-                            }
-
+                            shutdown(current_connection).await;
+                
+                            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+                
                         }
 
-                    }
-
-                },
-                Err(_err) =>
-                {
-
-                    if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(TIME_ELAPSED_FORCED_CLOSURE_NOTICE)))).await
-                    {
-            
-                        return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
-            
                     }
 
                 }
 
             }
-
+            
         }
 
-        current_connection.shutdown().await.unwrap();
+        shutdown(current_connection).await;
 
         //Send error or other message.
 
@@ -484,7 +568,25 @@ impl WebSocketActorState
 
         self.url = None;
 
-        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTED)))).await
+        {
+
+            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+        }
+
+        None
+
+    }
+
+    async fn force_disconnection_from_server(&mut self, current_connection: CurrentConnection) -> Option<ConnectedLoopExitReason>
+    {
+
+        current_connection.shutdown().await.unwrap();
+
+        self.url = None;
+
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(MovableText::Str(SERVER_DISCONNECTION_FORCED)))).await
         {
 
             return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
@@ -532,7 +634,7 @@ impl WebSocketActorState
 
                 //Connected!
 
-                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await
+                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(MovableText::Str(CONNECTION_SUCCEEDED)))).await
                 {
 
                     return CLEROrConnected::CLER(Some(ConnectedLoopExitReason::ActorIOClientDisconnected));
@@ -549,7 +651,7 @@ impl WebSocketActorState
 
                 //Send Error message to the actor-client
 
-                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await
+                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(err_string)))).await
                 {
 
                     return CLEROrConnected::CLER(Some(ConnectedLoopExitReason::ActorIOClientDisconnected));
@@ -566,7 +668,7 @@ impl WebSocketActorState
 
     //Not connected to a server, should continue?
 
-    async fn process_received_actor_input_message(&mut self, message: WebSocketActorInputMessage) -> ContinueOrConnected //bool
+    async fn process_received_actor_input_message(&mut self, message: WebSocketActorInputMessage) -> ContinueOrConnected
     {
 
         //Not connected
@@ -601,35 +703,37 @@ impl WebSocketActorState
             WebSocketActorInputMessage::Disconnect =>
             {
 
-                //Not connected
-
-                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
-                {
-
-                    return ContinueOrConnected::ShouldContinue(false);
-
-                }
-
-                ContinueOrConnected::ShouldContinue(true)
+                return self.report_not_connected().await;
 
             },
             WebSocketActorInputMessage::WriteFrame(_owned_frame) =>
             {
 
-                //Not connected
+                return self.report_not_connected().await;
 
-                if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
-                {
+            }
+            WebSocketActorInputMessage::SendPing =>
+            {
 
-                    return ContinueOrConnected::ShouldContinue(false);
-
-                }
-
-                ContinueOrConnected::ShouldContinue(true)
+                return self.report_not_connected().await;
 
             }
 
         }
+
+    }
+
+    async fn report_not_connected(&mut self) -> ContinueOrConnected
+    {
+
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::NotConnected(MovableText::Str(ERROR_NO_SERVER_CONNECTED)))).await
+        {
+
+            return ContinueOrConnected::ShouldContinue(false);
+
+        }
+
+        ContinueOrConnected::ShouldContinue(true)
 
     }
 
@@ -694,7 +798,13 @@ impl WebSocketActorState
 
                                 connected_loop_next_move = ConnectedLoopNextMove::WriteFrame(owned_frame);
 
-                            }                
+                            }
+                            WebSocketActorInputMessage::SendPing =>
+                            {
+
+                                connected_loop_next_move = ConnectedLoopNextMove::SendPing;
+
+                            }           
                 
                         }
 
@@ -712,30 +822,15 @@ impl WebSocketActorState
                 res = Self::read_frame(&mut current_connection, &self.in_the_read_pipeline_count) =>
                 {
 
+                    //Read a frame out of the current connection?
+
                     match res
                     {
 
                         Ok(frame) =>
                         {
 
-                            if frame.opcode == OpCode::Close
-                            {
-
-                                //Close frame not sent, connection closure initiated by the server.
-
-                                connected_loop_next_move = ConnectedLoopNextMove::DisconnectFromServer;
-
-                                //This ain't going down the pipleline.
-
-                                self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
-
-                            }
-                            else
-                            {
-
-                                connected_loop_next_move = ConnectedLoopNextMove::ProcessFrame(frame);
-
-                            }
+                            connected_loop_next_move = ConnectedLoopNextMove::ProcessFrame(frame);
 
                         },
                         Err(err) =>
@@ -757,7 +852,7 @@ impl WebSocketActorState
                 ConnectedLoopNextMove::PrepareForNewConnectionAndConnect(url) =>
                 {
 
-                    if !Self::continue_or_not(&self.disconnect_from_server(current_connection).await)
+                    if !Self::continue_or_not(&self.disconnect_from_server(current_connection, false).await)
                     {
 
                         return false;
@@ -790,7 +885,9 @@ impl WebSocketActorState
                 ConnectedLoopNextMove::DisconnectFromServer =>
                 {
 
-                    return Self::continue_or_not(&self.disconnect_from_server(current_connection).await);
+                    //User initiated disconnection
+
+                    return Self::continue_or_not(&self.disconnect_from_server(current_connection, false).await);
 
                 },
                 ConnectedLoopNextMove::WriteFrame(owned_frame) =>
@@ -799,7 +896,7 @@ impl WebSocketActorState
                     if let Err(err) = self.write_frame(&mut current_connection, owned_frame).await
                     {
 
-                        return Self::continue_or_not(&self.on_web_socket_error(err, current_connection).await);
+                        return Self::continue_or_not(&self.on_web_socket_error(err, current_connection).await); //, false).await);
 
                     }
 
@@ -807,18 +904,61 @@ impl WebSocketActorState
                 ConnectedLoopNextMove::OnWebSocketError(error) =>
                 {
 
-                    return Self::continue_or_not(&self.on_web_socket_error(error, current_connection).await);
+                    return Self::continue_or_not(&self.on_web_socket_error(error, current_connection).await); //, false).await);
 
                 },
                 ConnectedLoopNextMove::ProcessFrame(frame) =>
                 {
-            
-                    if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(frame)).await
+
+                    match frame.opcode
                     {
-            
-                        return false;
+
+                        OpCode::Close =>
+                        {
+
+                            //Close frame not sent, connection closure initiated by the server.
+
+                            //connected_loop_next_move = ConnectedLoopNextMove::DisconnectFromServer;
+
+                            //This ain't going down the pipleline.
+
+                            self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
+
+                            return Self::continue_or_not(&self.disconnect_from_server(current_connection, true).await);
+
+                        }
+                        OpCode::Ping =>
+                        {
+
+                           return Self::continue_or_not(&self.report_ping_received().await);
+
+                        }
+                        OpCode::Pong =>
+                        {
+
+                            return Self::continue_or_not(&self.report_pong_received().await);
+
+                        }
+                        OpCode::Continuation | OpCode::Text | OpCode::Binary =>
+                        {
+
+                            if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(frame)).await
+                            {
+                    
+                                return false;
+        
+                            }
+
+                        }
 
                     }
+        
+
+                }
+                ConnectedLoopNextMove::SendPing =>
+                {
+
+                    return Self::continue_or_not(&self.send_ping(&mut current_connection).await);
 
                 }
 
@@ -867,37 +1007,7 @@ impl WebSocketActorState
 
     }
 
-    async fn process_frame(&mut self, of: OwnedFrame) -> Option<ConnectedLoopExitReason> 
-    {
-
-        if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::Frame(of)).await
-        {
-
-            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
-
-        }
-
-        None
-
-    }
-
-    async fn initiate_disconnection(&mut self, current_connection: &mut CurrentConnection) -> bool
-    {
-
-        let _ = current_connection.write_frame(Frame::close_raw(vec![].into()));
-
-        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnecting(MovableText::Str(DISCONNECTION_FRAME_SENT)))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await
-        {
-
-            return false;
-
-        }
-
-        true
-
-    }
-
-    async fn on_web_socket_error(&mut self, error: WebSocketError, current_connection: CurrentConnection) -> Option<ConnectedLoopExitReason>
+    async fn on_web_socket_error(&mut self, error: WebSocketError, current_connection: CurrentConnection) -> Option<ConnectedLoopExitReason> //, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
     {
         let res = self.on_web_socket_error_report_only(error).await;
         
@@ -908,14 +1018,16 @@ impl WebSocketActorState
 
         }
 
-        self.disconnect_from_server(current_connection).await
+        //Force?
+
+        self.force_disconnection_from_server(current_connection).await //, received_close_frame).await
 
     }
 
     async fn on_web_socket_error_report_only(&mut self, error: WebSocketError) -> Option<ConnectedLoopExitReason>
     {
 
-        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(error.to_string())))).await //self.actor_io_server.output_sender().send(WebSocketActorOutputMessage::ServerMessage(WebSocketActorOutputServerMessage::Error(error.to_string()))).await
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(MovableText::String(error.to_string())))).await
         {
 
             return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
@@ -925,6 +1037,60 @@ impl WebSocketActorState
         None
 
     }
+
+    async fn report_ping_received(&mut self) -> Option<ConnectedLoopExitReason>
+    {
+
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::PingReceived(MovableText::Str(PING_RECEIVED)))).await
+        {
+
+            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+        }
+
+        None
+
+    }
+
+    async fn send_ping(&mut self, current_connection: &mut CurrentConnection) -> Option<ConnectedLoopExitReason>
+    {
+
+        //Send ping, report error or report that the ping has been sent, basically.
+
+        let ping_frame = Frame::new(true, OpCode::Ping, None, vec![].into());
+
+        if let Err(err) = current_connection.write_frame(ping_frame).await
+        {
+
+            return self.on_web_socket_error_report_only(err).await;
+
+        }
+
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::PingReceived(MovableText::Str(PING_SENT)))).await
+        {
+
+            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+        }
+
+        None
+
+    }
+
+    async fn report_pong_received(&mut self) -> Option<ConnectedLoopExitReason>
+    {
+
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::PingReceived(MovableText::Str(PONG_RECEIVED)))).await
+        {
+
+            return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
+
+        }
+
+        None
+
+    }
+
 
 }
 

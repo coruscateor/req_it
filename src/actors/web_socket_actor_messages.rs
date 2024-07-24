@@ -42,7 +42,8 @@ pub enum WebSocketActorInputMessage
 
     ConnectTo(String), //, Sender<()>) //URL, Has the WebSockect actor started trying to connect to the server?
     Disconnect,
-    WriteFrame(OwnedFrame)
+    WriteFrame(OwnedFrame),
+    SendPing
 
 }
 
@@ -57,6 +58,8 @@ pub enum WebSocketActorOutputClientMessage
     Disconnected(MovableText),
     Disconnecting(MovableText),
     NotConnected(MovableText),
+    PingReceived(MovableText),
+    PongReceived(MovableText)
 
 }
 
@@ -69,32 +72,13 @@ impl AsStr for WebSocketActorOutputClientMessage
         match self
         {
 
-            WebSocketActorOutputClientMessage::ConnectionSucceed(message) =>
-            {
-
-                message.as_str()
-
-            }
-
-            WebSocketActorOutputClientMessage::ConnectionFailed(message) =>
-            {
-
-                message.as_str()
-
-            }
-            WebSocketActorOutputClientMessage::Disconnected(message) =>
-            {
-
-                message.as_str()
-
-            }
-            WebSocketActorOutputClientMessage::NotConnected(message) =>
-            {
-
-                message.as_str()
-
-            }
-            WebSocketActorOutputClientMessage::Disconnecting(message) =>
+            WebSocketActorOutputClientMessage::ConnectionSucceed(message) |
+            WebSocketActorOutputClientMessage::ConnectionFailed(message) |
+            WebSocketActorOutputClientMessage::Disconnected(message) |
+            WebSocketActorOutputClientMessage::NotConnected(message) |
+            WebSocketActorOutputClientMessage::Disconnecting(message) |
+            WebSocketActorOutputClientMessage::PingReceived(message) |
+            WebSocketActorOutputClientMessage::PongReceived(message) =>
             {
 
                 message.as_str()
@@ -109,6 +93,7 @@ impl AsStr for WebSocketActorOutputClientMessage
 
 //Remote server message
 
+/*
 #[derive(Debug)]
 pub enum WebSocketActorOutputServerMessage
 {
@@ -117,6 +102,7 @@ pub enum WebSocketActorOutputServerMessage
     Error(String)
 
 }
+*/
 
 
 /*
