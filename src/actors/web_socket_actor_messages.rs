@@ -1,6 +1,6 @@
-//use gtk_estate::corlib::{AsStr, MovableText};
+//use gtk_estate::corlib::{AsStr, SendableText};
 
-use corlib::text::{AsStr, MovableText};
+use corlib::text::{AsStr, SendableText};
 
 use tokio::sync::oneshot::Sender;
 
@@ -53,13 +53,13 @@ pub enum WebSocketActorInputMessage
 pub enum WebSocketActorOutputClientMessage
 {
 
-    ConnectionSucceed(MovableText),
-    ConnectionFailed(MovableText),
-    Disconnected(MovableText),
-    Disconnecting(MovableText),
-    NotConnected(MovableText),
-    PingReceived(MovableText),
-    PongReceived(MovableText)
+    ConnectionSucceed(SendableText),
+    ConnectionFailed(SendableText),
+    Disconnected(SendableText),
+    Disconnecting(SendableText),
+    NotConnected(SendableText),
+    PingReceived(SendableText),
+    PongReceived(SendableText)
 
 }
 
@@ -157,6 +157,7 @@ pub enum ReadFrameProcessorActorOutputMessage
 
 //The current WebSocket client state for both actor and GUI states.
 
+/*
 #[derive(Debug, Default, Eq, PartialEq)]
 pub enum WebSocketConnectionState
 {
@@ -168,5 +169,5 @@ pub enum WebSocketConnectionState
     Disconnecting
 
 }
-
+*/
 
