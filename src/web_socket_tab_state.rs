@@ -23,7 +23,8 @@ use gtk_estate::adw::glib::clone::Upgrade;
 
 use corlib::upgrading::{up_rc, up_rc_pt};
 
-use gtk_estate::gtk4::{Align, ListBox};
+use gtk_estate::adw::prelude::Cast;
+use gtk_estate::gtk4::{Align, ListBox, StringObject};
 
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
 
@@ -41,7 +42,7 @@ use gtk_estate::corlib::{impl_as_any, AsAny};
 
 //use corlib::upgrading::up_rc;
 
-use corlib::rfc::borrow_mut;
+use corlib::rfc::{borrow, borrow_mut};
 
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
@@ -120,7 +121,8 @@ enum ConnectionStatus
     #[default]
     NotConnected,
     Connecting,
-    Reconnecting,
+    //ReConnecting,
+    SwappingConnection,
     Connected,
     Disconnecting
 
@@ -143,10 +145,19 @@ impl ConnectionStatus
 
     }
 
-    pub fn is_reconnecting(&self) -> bool
+    /*
+    pub fn is_re_connecting(&self) -> bool
     {
 
-        *self == Self::Reconnecting
+        *self == Self::ReConnecting
+
+    }
+    */
+
+    pub fn is_swapping_connection(&self) -> bool
+    {
+
+        *self == Self::SwappingConnection
 
     }
 
@@ -179,7 +190,8 @@ impl Display for ConnectionStatus
 
             ConnectionStatus::NotConnected => { text = "NotConnected" },
             ConnectionStatus::Connecting => { text = "Connecting" },
-            ConnectionStatus::Reconnecting => { text = "Reconnecting" },
+            //ConnectionStatus::ReConnecting => { text = "Reconnecting" },
+            ConnectionStatus::SwappingConnection => { text = "SwappingConnection" },
             ConnectionStatus::Connected => { text = "Connected" },
             ConnectionStatus::Disconnecting => { text = "Disconnecting" }
 
@@ -282,7 +294,7 @@ pub struct WebSocketTabState
     tokio_rt_handle: Handle,
 
     web_socket_actor_poller: RcSimpleTimeOut<Weak<WebSocketTabState>>,
-    send_ping: Button,
+    send_ping_button: Button,
     connected_address_text: Text,
     connection_status_text: Text,
     mut_state: RefCell<MutState>
@@ -389,7 +401,9 @@ impl WebSocketTabState
 
         tool_center_box.append(&connect_button);
 
-        let disconnect_button = Button::builder().label("Disconnect").visible(false).build();
+        let disconnect_button = Button::builder().label("Disconnect").build(); //.visible(false)
+
+        disconnect_button.set_sensitive(false);
 
         tool_center_box.append(&disconnect_button);
 
@@ -397,9 +411,9 @@ impl WebSocketTabState
 
         //Right
 
-        let tool_right_box = Box::new(Orientation::Horizontal, 2);
+        let tool_right_box = Box::new(Orientation::Horizontal, 0); //2);
 
-        tool_right_box.set_margin_start(10);
+        //tool_right_box.set_margin_start(10);
 
         //Binary to BSON or JSON, JSON Only DropDown
 
@@ -419,9 +433,11 @@ impl WebSocketTabState
 
         connected_address_text.set_sensitive(false);
 
-        connected_address_text.set_hexpand(true);
+        //connected_address_text.set_hexpand(true);
 
         connected_address_text.buffer().set_text("http://localhost:3000");
+
+        //connected_address_text.set_halign(Align::End); //.set_alignment(xalign)
 
         tool_right_box.append(&connected_address_text);
 
@@ -435,17 +451,17 @@ impl WebSocketTabState
 
         let default_cn = ConnectionStatus::NotConnected;
 
-        connection_status_text.buffer().set_text(default_cn.to_string());
+        connection_status_text.buffer().set_text(default_cn.to_string()); //"NotConnected");
 
         tool_right_box.append(&connection_status_text);
 
         //The ping button
 
-        let send_ping = Button::builder().label("Ping").build();
+        let send_ping_button = Button::builder().label("Ping").build();
 
-        send_ping.set_sensitive(false);
+        send_ping_button.set_sensitive(false);
 
-        tool_right_box.append(&send_ping);
+        tool_right_box.append(&send_ping_button);
 
         //
 
@@ -609,8 +625,11 @@ impl WebSocketTabState
 
         let tokio_rt_handle = wcs.tokio_rt_handle();
 
+        let write_frame_processor_actor_io_client = enter!(tokio_rt_handle, WriteFrameProcessorActorState::spawn());
+
         //let web_socket_actor 
         
+        /*
         let write_frame_processor_actor_io_client = enter!(tokio_rt_handle, || {
 
             //WebSocketActor::new(actor_state)
@@ -620,6 +639,7 @@ impl WebSocketTabState
             WriteFrameProcessorActorState::spawn()
 
         });
+        */
 
         let this =  Rc::new_cyclic( move |weak_self|
         {
@@ -670,7 +690,7 @@ impl WebSocketTabState
                 write_frame_processor_actor_io_client,
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
                 web_socket_actor_poller: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
-                send_ping,
+                send_ping_button,
                 connected_address_text,
                 connection_status_text,
                 mut_state: RefCell::new(MutState::new())
@@ -678,14 +698,6 @@ impl WebSocketTabState
             }
 
         });
-
-        //Get the StateContainers
-
-        //let scs = StateContainers::get();
-
-        //Add the GraphQLTabState to the the StateContainers
-
-        //scs.add(&this);
 
         //Add this WebSocketTabState object to the StateContainers Rc instance.
 
@@ -695,71 +707,58 @@ impl WebSocketTabState
 
         let weak_self = this.adapted_contents_box.weak_parent();
 
-        this.connect_button.connect_clicked(move |btn|
+        this.connect_button.connect_clicked(move |_btn|
         {
 
             up_rc(&weak_self, |this|
             {
 
-                //btn.set_sensitive(false);
-
                 let address_text_buffer = this.address_text.buffer();
 
-                let res = borrow_mut(&this.mut_state, |_mut_mut_state|
+                if address_text_buffer.length() == 0
                 {
 
-                    if address_text_buffer.length() == 0
-                    {
+                    //display error
 
-                        //display error
+                    this.output_message("Error: no address provided.");
 
-                        this.output_message("Error: no address provided.");
+                    return;
 
-                        return false;
+                }
 
-                    }
+                let address = this.address_text.text().to_string();
 
-                    true
+                if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //.web_socket_actor_io_client().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //web_socket_actor.interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address))
+                {
 
-                    //Return if we're already connected.
+                    //Error: Counld not contact web_socket_actor.
 
-                    /*
-                    if this.web_socket_actor_poller.is_active()
-                    {
+                    panic!("Error: Counld not contact web_socket_actor.");
 
-                        return;
+                }
 
-                    }
-                    */
+                let res = borrow(&this.mut_state,|mut_state|
+                {
 
-                    /*
-                        web_socket_actor_message::WebSocketActorInputMessage` doesn't implement `std::fmt::Debug`
-                        the trait `std::fmt::Debug` is not implemented for `web_socket_actor_message::WebSocketActorInputMessage`, which is required by `tokio::sync::mpsc::error::TrySendError<web_socket_actor_message::WebSocketActorInputMessage>: std::fmt::Debug`
-                        add `#[derive(Debug)]` to `web_socket_actor_message::WebSocketActorInputMessage` or manually `impl std::fmt::Debug for web_socket_actor_message::WebSocketActorInputMessage`
-                        the trait `std::fmt::Debug` is implemented for `tokio::sync::mpsc::error::TrySendError<T>`
-                        required for `tokio::sync::mpsc::error::TrySendError<web_socket_actor_message::WebSocketActorInputMessage>` to implement `std::fmt::Debug`rustcClick for full compiler diagnostic
-                        result.rs(1073, 12): required by a bound in `Result::<T, E>::unwrap`
-                        web_socket_actor_message.rs(31, 1): consider annotating `web_socket_actor_message::WebSocketActorInputMessage` with `#[derive(Debug)]`: `#[derive(Debug)]
-                        `
-                        web_socket_tab_state.rs(498, 70): consider removing this method call, as the receiver has type `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>` and `&tokio::sync::mpsc::Sender<web_socket_actor_message::WebSocketActorInputMessage>: std::fmt::Debug` trivially holds
-                     */
+                    mut_state.connection_status
 
                 });
 
-                if res
+                if res == ConnectionStatus::Connected
                 {
 
-                    let address = this.address_text.text().to_string();
+                    //Reconnecting?
 
-                    if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //.web_socket_actor_io_client().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address)) //web_socket_actor.interactor().input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address))
-                    {
+                    //this.set_status(ConnectionStatus::ReConnecting);
 
-                        //Error: Counld not contact web_socket_actor.
+                    this.set_status(ConnectionStatus::SwappingConnection);
 
-                        panic!("Error: Counld not contact web_socket_actor.");
+                }
+                else
+                {
 
-                    }
-
+                    //Not currently connected
+                    
                     this.set_status(ConnectionStatus::Connecting);
 
                 }
@@ -772,7 +771,7 @@ impl WebSocketTabState
 
         //The disconnect button
 
-        this.disconnect_button.connect_clicked(move |btn|
+        this.disconnect_button.connect_clicked(move |_btn|
         {
 
             //Disconnect from the server.
@@ -784,61 +783,23 @@ impl WebSocketTabState
 
                 let address_text_buffer = this.address_text.buffer();
 
-                //let address_text_buffer_ref = &address_text_buffer;
-
-                let res = borrow_mut(&this.mut_state, |mut mut_state|
+                let res = borrow(&this.mut_state, |mut_state|
                 {
 
-                    if !mut_state.connection_status.is_not_connected()
+                    match mut_state.connection_status
                     {
 
-                        return false;
+                        //Are we anything other than connected?
+
+                        ConnectionStatus::NotConnected | ConnectionStatus::Connecting | ConnectionStatus::SwappingConnection | ConnectionStatus::Disconnecting =>
+                        {
+
+                            return false;
+
+                        }
+                        ConnectionStatus::Connected => return true
 
                     }
-
-                    //let address_text_buffer = this.address_text.buffer();
-
-                    /*
-                    if address_text_buffer.length() == 0
-                    {
-
-                        //display error
-
-                        this.output_message("Error: no address provided.");
-
-                        return false;
-
-                    }
-                    */
-
-                    true
-
-                    //btn.set_sensitive(false);
-
-                    //mut_state.connection_status = ConnectionStatus::Connecting;
-
-                    /*
-                    btn.set_visible(false);
-
-                    if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::Disconnect) //.web_socket_actor_io_client().input_sender().try_send(WebSocketActorInputMessage::Disconnect)
-                    {
-
-                        //Error: Could not contact web_socket_actor.
-
-                        panic!("Error: Could not contact web_socket_actor.");
-
-                    }
-                    else
-                    {
-
-                        let connect_button = &this.connect_button;
-                        
-                        connect_button.set_sensitive(true);
-                        
-                        connect_button.set_visible(true);
-
-                    }
-                    */
 
                 });
 
@@ -863,6 +824,45 @@ impl WebSocketTabState
                 }
 
             });
+
+        });
+
+        let weak_self = this.adapted_contents_box.weak_parent();
+
+        this.format_dropdown.connect_selected_item_notify(move |dd|
+        {
+
+            up_rc(&weak_self, |this|
+            {
+
+                if let Some(item) = dd.selected_item()
+                {
+
+                    if let Some(so_item) = item.downcast_ref::<StringObject>()
+                    {
+
+                        let text = TEXT;
+
+                        match so_item.string()
+                        {
+
+                            text =>
+                            {
+
+                                //Change output format to text.
+
+                            }
+
+                        }
+
+                    }
+
+                    //Else error...
+
+                }
+
+            });
+
 
         });
 
@@ -1090,92 +1090,75 @@ impl WebSocketTabState
                 ConnectionStatus::NotConnected =>
                 {
 
-                    //mut_state.connection_status = ConnectionStatus::Connected;
+                    //self.disconnect_button.set_visible(false);
 
-                    if self.disconnect_button.is_visible()
-                    {
+                    self.format_dropdown.set_sensitive(true);
 
-                        self.disconnect_button.set_visible(false);
+                    self.disconnect_button.set_sensitive(false);
 
-                    }
+                    self.send_button.set_sensitive(false);
 
-                    let connect_button = &self.connect_button;
+                    //let connect_button = &self.connect_button;
 
-                    connect_button.set_sensitive(true);
+                    self.connect_button.set_sensitive(true);
                     
-                    connect_button.set_visible(true);
+                    //connect_button.set_visible(true);
 
-                    //self.web_socket_actor_poller.stop();
+                    self.send_ping_button.set_sensitive(false);
 
-                    //Disconnected
-
-                    /*
-                    if this.disconnect_button.is_visible()
-                    {
-
-                        this.disconnect_button.set_visible(false);
-
-                    }
-
-                    let connect_button = &this.connect_button;
-
-                    connect_button.set_sensitive(true);
-                    
-                    connect_button.set_visible(true);
-                    */
-                    
-                    //NotConnected
-
-                    /*
-                    if this.disconnect_button.is_visible()
-                    {
-
-                        this.disconnect_button.set_visible(false);
-
-                    }
-
-                    let connect_button = &this.connect_button;
-
-                    if !connect_button.is_sensitive()
-                    {
-
-                        connect_button.set_sensitive(true);
-
-                    }
-
-                    if !connect_button.is_visible()
-                    {
-                    
-                        connect_button.set_visible(true);
-
-                    }
-                    */
+                    self.connected_address_text.buffer().set_text("");
 
                 }
                 ConnectionStatus::Connecting =>
                 {
 
+                    self.format_dropdown.set_sensitive(false);
+
+                    self.connect_button.set_sensitive(false);
+
+                    //self.connect_button.set_sensitive(false);
+
+                    self.connected_address_text.buffer().set_text(self.connected_address_text.buffer().text());
+
+                    //
+
                     self.web_socket_actor_poller.start();
 
                 }
-                ConnectionStatus::Reconnecting =>
+                ConnectionStatus::SwappingConnection =>
                 {
 
+                    self.send_button.set_sensitive(false);
 
+                    self.connect_button.set_sensitive(false);
+
+                    self.connected_address_text.buffer().set_text(self.connected_address_text.buffer().text());
+
+                    self.send_ping_button.set_sensitive(false);
 
                 }
                 ConnectionStatus::Connected =>
                 {
 
-                    self.connect_button.set_visible(false);
+                    //self.connect_button.set_visible(false);
 
-                    self.disconnect_button.set_visible(true);
+                    //self.disconnect_button.set_visible(true);
+
+                    self.send_button.set_sensitive(true);
+
+                    self.send_ping_button.set_sensitive(true);
 
                 }
                 ConnectionStatus::Disconnecting =>
                 {
 
+                    self.connect_button.set_sensitive(false);
+
                     self.disconnect_button.set_sensitive(false);
+
+                    self.send_button.set_sensitive(false);
+
+                    self.send_ping_button.set_sensitive(false);
 
                 }
 
