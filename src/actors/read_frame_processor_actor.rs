@@ -4,7 +4,7 @@ use fastwebsockets::OpCode;
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
-use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage}; //, WebSocketActorOutputMessage};
+use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage}; //, WebSocketActorOutputMessage};
 
 use std::{rc::Rc, sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}};
 
@@ -117,14 +117,31 @@ impl ReadFrameProcessorActorState
                         
                     }
 
+                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await
+                    {
+
+                        return false;
+
+                    }
+
+                    self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
+
                 }
-                ReadFrameProcessorActorInputMessage::ClientMessage(_) => todo!(),
+                ReadFrameProcessorActorInputMessage::ClientMessage(message) =>
+                {
+
+                    //Client messages get passed through to the UI.
+                    
+                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::ClientMessage(message)).await
+                    {
+
+                        return false;
+
+                    }
+
+                }
                 
             }
-
-            let _ = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await; //.unwrap();
-
-            self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
 
             return true;
 

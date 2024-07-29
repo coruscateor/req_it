@@ -116,11 +116,20 @@ pub enum WebSocketActorOutputMessage
 }
 */
 
+#[derive(Debug, Default, Clone, Copy)]
+pub enum ProcessingFormat
+{
+
+    #[default]
+    Text
+
+}
+
 #[derive(Debug)]
 pub enum WriteFrameProcessorActorInputMessage
 {
 
-    Process(String),
+    Process(String, ProcessingFormat),
     //PassThroughToWebSocketActor()
 
 }

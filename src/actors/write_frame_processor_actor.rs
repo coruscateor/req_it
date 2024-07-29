@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 
 use paste::paste;
 
-use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
+use super::{ProcessingFormat, ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
 
 //WebSocketActorOutputMessage,
 
@@ -174,35 +174,45 @@ impl WriteFrameProcessorActorState
             match message
             {
 
-                WriteFrameProcessorActorInputMessage::Process(contents) =>
+                WriteFrameProcessorActorInputMessage::Process(contents, format) =>
                 {
 
                     //Get from cache...
 
                     let mut of = OwnedFrame::new();
 
-                    of.opcode = OpCode::Text;
-
-                    //Set the payload of the OwnedFrame the right size.
-
-                    let content_bytes = contents.as_bytes();
-
-                    let payload = &mut of.payload;
-                    
-                    let cb_len = content_bytes.len();
-
-                    if cb_len != payload.len()
+                    match format
                     {
 
-                        payload.resize(cb_len, 0);
+                        ProcessingFormat::Text =>
+                        {
+
+                            of.opcode = OpCode::Text;
+
+                            //Set the payload of the OwnedFrame the right size.
+        
+                            let content_bytes = contents.as_bytes();
+        
+                            let payload = &mut of.payload;
+                            
+                            let cb_len = content_bytes.len();
+        
+                            if cb_len != payload.len()
+                            {
+        
+                                payload.resize(cb_len, 0);
+        
+                            }
+        
+                            //Copy the bytes into the OwnedFrame payload. 
+        
+                            payload.copy_from_slice(content_bytes);
+
+                        }
 
                     }
 
-                    //Copy the bytes into the OwnedFrame payload. 
-
-                    payload.copy_from_slice(content_bytes);
-
-                    if let Err(_) = self.web_socket_input_sender.send(WebSocketActorInputMessage::WriteFrame(of)).await //web_socket_actor_io_client.input_sender().send(WebSocketActorInputMessage::WriteFrame(of)).await
+                    if let Err(_) = self.web_socket_input_sender.send(WebSocketActorInputMessage::WriteFrame(of)).await
                     {
 
                         return false;

@@ -63,7 +63,7 @@ use widget_ext::{set_margin_sides_and_bottom, set_margin_start_and_end, set_marg
 
 //https://web.archive.org/web/20221126181112/https://world.pages.gitlab.gnome.org/Rust/libadwaita-rs/stable/latest/docs/libadwaita/index.html
 
-use crate::actors::{WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActor, WriteFrameProcessorActorIOClient, WriteFrameProcessorActorState};
+use crate::actors::{ProcessingFormat, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActor, WriteFrameProcessorActorIOClient, WriteFrameProcessorActorInputMessage, WriteFrameProcessorActorState};
 
 use crate::window_contents_state::WindowContentsState;
 
@@ -122,7 +122,7 @@ enum ConnectionStatus
     NotConnected,
     Connecting,
     //ReConnecting,
-    SwappingConnection,
+    //SwappingConnection,
     Connected,
     Disconnecting
 
@@ -154,12 +154,14 @@ impl ConnectionStatus
     }
     */
 
+    /*
     pub fn is_swapping_connection(&self) -> bool
     {
 
         *self == Self::SwappingConnection
 
     }
+    */
 
     pub fn is_connected(&self) -> bool
     {
@@ -191,7 +193,7 @@ impl Display for ConnectionStatus
             ConnectionStatus::NotConnected => { text = "NotConnected" },
             ConnectionStatus::Connecting => { text = "Connecting" },
             //ConnectionStatus::ReConnecting => { text = "Reconnecting" },
-            ConnectionStatus::SwappingConnection => { text = "SwappingConnection" },
+            //ConnectionStatus::SwappingConnection => { text = "SwappingConnection" },
             ConnectionStatus::Connected => { text = "Connected" },
             ConnectionStatus::Disconnecting => { text = "Disconnecting" }
 
@@ -223,7 +225,8 @@ impl Display for ConnectionStatus
 struct MutState
 {
 
-    pub connection_status: ConnectionStatus
+    pub connection_status: ConnectionStatus,
+    pub processing_format: ProcessingFormat
 
 }
 
@@ -236,7 +239,8 @@ impl MutState
         Self
         {
 
-            connection_status: ConnectionStatus::NotConnected
+            connection_status: ConnectionStatus::NotConnected,
+            processing_format: ProcessingFormat::Text
 
         }
 
@@ -737,13 +741,18 @@ impl WebSocketTabState
 
                 }
 
-                let res = borrow(&this.mut_state,|mut_state|
+                /*
+                let res = borrow(&this.mut_state,|mut_state_ref|
                 {
 
-                    mut_state.connection_status
+                    mut_state_ref.connection_status
 
                 });
+                */
 
+                this.set_status(ConnectionStatus::Connecting);
+
+                /*
                 if res == ConnectionStatus::Connected
                 {
 
@@ -762,6 +771,7 @@ impl WebSocketTabState
                     this.set_status(ConnectionStatus::Connecting);
 
                 }
+                */
 
             });
             
@@ -791,7 +801,7 @@ impl WebSocketTabState
 
                         //Are we anything other than connected?
 
-                        ConnectionStatus::NotConnected | ConnectionStatus::Connecting | ConnectionStatus::SwappingConnection | ConnectionStatus::Disconnecting =>
+                        ConnectionStatus::NotConnected | ConnectionStatus::Connecting | ConnectionStatus::Disconnecting => //ConnectionStatus::SwappingConnection |
                         {
 
                             return false;
@@ -829,6 +839,36 @@ impl WebSocketTabState
 
         let weak_self = this.adapted_contents_box.weak_parent();
 
+        this.send_button.connect_clicked(move |_btn|
+        {
+
+            up_rc(&weak_self, |this|
+            {
+
+                let format = borrow(&this.mut_state, |mut_state|
+                {
+
+                    mut_state.processing_format
+
+                });
+
+                let tv_string = get_text_view_string(&this.to_be_sent_text);
+
+                if let Err(err) = this.write_frame_processor_actor_io_client.sender().try_send(WriteFrameProcessorActorInputMessage::Process(tv_string, format))
+                {
+
+                    panic!("{}", err)
+
+                }
+
+            });
+
+        });
+
+        //Select the format of the message payload.
+
+        let weak_self = this.adapted_contents_box.weak_parent();
+
         this.format_dropdown.connect_selected_item_notify(move |dd|
         {
 
@@ -841,16 +881,26 @@ impl WebSocketTabState
                     if let Some(so_item) = item.downcast_ref::<StringObject>()
                     {
 
-                        let text = TEXT;
+                        //let text = TEXT;
 
-                        match so_item.string()
+                        match so_item.string().as_str()
                         {
 
-                            text =>
+                            "Text" => //TEXT => //text =>
                             {
 
                                 //Change output format to text.
 
+                                borrow_mut(&this.mut_state, |mut mut_state|
+                                {
+
+                                    mut_state.processing_format = ProcessingFormat::Text;
+
+                                })
+
+                            }
+                            _ =>
+                            {
                             }
 
                         }
@@ -974,6 +1024,8 @@ impl WebSocketTabState
                     Err(err) =>
                     {
 
+                        //panic!("{}", err);
+
                         match err
                         {
 
@@ -991,12 +1043,14 @@ impl WebSocketTabState
 
                                 //Is disconnected?
 
+                                /*
                                 if this.connect_button.is_visible()
                                 {
 
                                     return false;
 
                                 }
+                                */
 
                             },
                             TryRecvError::Disconnected =>
@@ -1092,29 +1146,33 @@ impl WebSocketTabState
 
                     //self.disconnect_button.set_visible(false);
 
-                    self.format_dropdown.set_sensitive(true);
-
-                    self.disconnect_button.set_sensitive(false);
+                    //self.format_dropdown.set_sensitive(true);
 
                     self.send_button.set_sensitive(false);
 
-                    //let connect_button = &self.connect_button;
-
                     self.connect_button.set_sensitive(true);
+
+                    self.disconnect_button.set_sensitive(false);
+
+                    //let connect_button = &self.connect_button;
                     
                     //connect_button.set_visible(true);
 
-                    self.send_ping_button.set_sensitive(false);
-
                     self.connected_address_text.buffer().set_text("");
+
+                    //self.connection_status_text
+
+                    self.send_ping_button.set_sensitive(false);
 
                 }
                 ConnectionStatus::Connecting =>
                 {
 
-                    self.format_dropdown.set_sensitive(false);
+                    //self.format_dropdown.set_sensitive(false);
 
                     self.connect_button.set_sensitive(false);
+
+                    self.disconnect_button.set_sensitive(false);
 
                     //self.connect_button.set_sensitive(false);
 
@@ -1125,6 +1183,7 @@ impl WebSocketTabState
                     self.web_socket_actor_poller.start();
 
                 }
+                /*
                 ConnectionStatus::SwappingConnection =>
                 {
 
@@ -1137,6 +1196,7 @@ impl WebSocketTabState
                     self.send_ping_button.set_sensitive(false);
 
                 }
+                */
                 ConnectionStatus::Connected =>
                 {
 
@@ -1146,17 +1206,21 @@ impl WebSocketTabState
 
                     self.send_button.set_sensitive(true);
 
+                    self.connect_button.set_sensitive(true);
+
+                    self.disconnect_button.set_sensitive(true);
+
                     self.send_ping_button.set_sensitive(true);
 
                 }
                 ConnectionStatus::Disconnecting =>
                 {
 
+                    self.send_button.set_sensitive(false);
+
                     self.connect_button.set_sensitive(false);
 
                     self.disconnect_button.set_sensitive(false);
-
-                    self.send_button.set_sensitive(false);
 
                     self.send_ping_button.set_sensitive(false);
 
