@@ -58,8 +58,9 @@ pub enum WebSocketActorOutputClientMessage
     Disconnected(SendableText),
     Disconnecting(SendableText),
     NotConnected(SendableText),
-    PingReceived(SendableText),
-    PongReceived(SendableText)
+    PingFrameReceived(SendableText),
+    PongFrameReceived(SendableText),
+    CloseFrameReceived(SendableText)
 
 }
 
@@ -77,8 +78,9 @@ impl AsStr for WebSocketActorOutputClientMessage
             WebSocketActorOutputClientMessage::Disconnected(message) |
             WebSocketActorOutputClientMessage::NotConnected(message) |
             WebSocketActorOutputClientMessage::Disconnecting(message) |
-            WebSocketActorOutputClientMessage::PingReceived(message) |
-            WebSocketActorOutputClientMessage::PongReceived(message) =>
+            WebSocketActorOutputClientMessage::PingFrameReceived(message) |
+            WebSocketActorOutputClientMessage::PongFrameReceived(message) |
+            WebSocketActorOutputClientMessage::CloseFrameReceived(message) =>
             {
 
                 message.as_str()

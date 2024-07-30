@@ -23,7 +23,7 @@ use gtk_estate::adw::glib::clone::Upgrade;
 
 use corlib::upgrading::{up_rc, up_rc_pt};
 
-use gtk_estate::adw::prelude::Cast;
+use gtk_estate::adw::prelude::{Cast, ObjectExt};
 use gtk_estate::gtk4::{Align, ListBox, StringObject};
 
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
@@ -50,6 +50,10 @@ use hyper::client::conn::http1::Connection;
 use tokio::runtime::Handle;
 
 use widget_ext::{set_margin_sides_and_bottom, set_margin_start_and_end, set_margin_top_and_bottom};
+
+//use super::pipeline_message_counter::*;
+
+use crate::actors::pipeline_message_counter::*;
 
 //https://gtk-rs.org/gtk4-rs/stable/latest/docs/gtk4/struct.Paned.html
 
@@ -114,7 +118,6 @@ static TEXT: &str = "Text";
 
 static FORMAT_DROPDOWN_STRS: &[&str] = &[TEXT];
 
-
 #[derive(Debug, Default, Eq, PartialEq, Copy, Clone)]
 enum ConnectionStatus
 {
@@ -174,6 +177,16 @@ impl ConnectionStatus
     {
 
         *self == Self::Disconnecting
+
+    }
+
+    ///
+    /// Active connections are in the Connecting, Connected or Disconnecting states.
+    /// 
+    pub fn is_active(&self) -> bool
+    {
+
+        self.is_connecting() | self.is_connected() | self.is_disconnecting()
 
     }
 
@@ -280,7 +293,7 @@ pub struct WebSocketTabState
 
     //received_text: TextView,
 
-    received_messages: ListBox,
+    received_messages: Box, //ListBox,
     received_messages_child_observer: ListModel,
 
     //Bottom Right
@@ -301,7 +314,8 @@ pub struct WebSocketTabState
     send_ping_button: Button,
     connected_address_text: Text,
     connection_status_text: Text,
-    mut_state: RefCell<MutState>
+    mut_state: RefCell<MutState>,
+    pipeline_message_count_decrementor: Decrementor
 
 }
 
@@ -439,7 +453,7 @@ impl WebSocketTabState
 
         //connected_address_text.set_hexpand(true);
 
-        connected_address_text.buffer().set_text("http://localhost:3000");
+        //connected_address_text.buffer().set_text("http://localhost:3000");
 
         //connected_address_text.set_halign(Align::End); //.set_alignment(xalign)
 
@@ -577,7 +591,13 @@ impl WebSocketTabState
 
         //let received_text = TextView::new();
 
-        let received_messages = ListBox::new();
+        let received_messages = Box::new(Orientation::Vertical, 10); //ListBox::new();
+
+        received_messages.set_vexpand(true);
+
+        received_messages.set_margin_top(20);
+
+        received_messages.set_valign(Align::Start);
 
         let received_messages_child_observer = received_messages.observe_children();
 
@@ -629,7 +649,11 @@ impl WebSocketTabState
 
         let tokio_rt_handle = wcs.tokio_rt_handle();
 
-        let write_frame_processor_actor_io_client = enter!(tokio_rt_handle, WriteFrameProcessorActorState::spawn());
+        //For counting messages in the read side of the pipeline.
+
+        let (pipeline_message_count_incrementor, pipeline_message_count_decrementor) = inc_dec();
+
+        let write_frame_processor_actor_io_client = enter!(tokio_rt_handle, WriteFrameProcessorActorState::spawn(pipeline_message_count_incrementor));
 
         //let web_socket_actor 
         
@@ -697,7 +721,8 @@ impl WebSocketTabState
                 send_ping_button,
                 connected_address_text,
                 connection_status_text,
-                mut_state: RefCell::new(MutState::new())
+                mut_state: RefCell::new(MutState::new()),
+                pipeline_message_count_decrementor
 
             }
 
@@ -796,6 +821,9 @@ impl WebSocketTabState
                 let res = borrow(&this.mut_state, |mut_state|
                 {
 
+                    mut_state.connection_status
+
+                    /* 
                     match mut_state.connection_status
                     {
 
@@ -810,10 +838,11 @@ impl WebSocketTabState
                         ConnectionStatus::Connected => return true
 
                     }
+                    */
 
                 });
 
-                if res
+                if res.is_active()
                 {
 
                     if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address_text_buffer.text().into()))
@@ -938,6 +967,8 @@ impl WebSocketTabState
                             ReadFrameProcessorActorOutputMessage::Processed(processed_text) =>
                             {
 
+                                //this.pipeline_message_count_decrementor.dec();
+
                                 this.output_message(&processed_text);
 
                             },
@@ -1005,7 +1036,7 @@ impl WebSocketTabState
                                         this.set_status(ConnectionStatus::Disconnecting);
 
                                     }
-                                    WebSocketActorOutputClientMessage::PingReceived(message) | WebSocketActorOutputClientMessage::PongReceived(message) =>
+                                    WebSocketActorOutputClientMessage::PingFrameReceived(message) | WebSocketActorOutputClientMessage::PongFrameReceived(message) | WebSocketActorOutputClientMessage::CloseFrameReceived(message) =>
                                     {
 
                                         this.output_message(&message);
@@ -1032,9 +1063,22 @@ impl WebSocketTabState
                             TryRecvError::Empty =>
                             {
 
-                                //Are read frames being processed?
+                                let connection_status = borrow(&this.mut_state, |mut_state|
+                                {
 
-                                if this.write_frame_processor_actor_io_client.is_processing_read_frames()
+                                    mut_state.connection_status
+
+                                });
+
+                                //Are read frames being processed or is the connection status currently still in an active state?
+
+                                //if connection_status.is_active() || this.pipeline_message_count_decrementor.has_messages() //this.write_frame_processor_actor_io_client.is_processing_read_frames() || 
+
+                                let is_active = connection_status.is_active();
+
+                                let has_messages = this.pipeline_message_count_decrementor.has_messages();
+
+                                if is_active || has_messages
                                 {
 
                                     return true;
@@ -1094,7 +1138,7 @@ impl WebSocketTabState
 
         let limit = 20; //500;
 
-        if limit < self.received_messages_child_observer.n_items()
+        if self.received_messages_child_observer.n_items() == limit
         {
 
             let received_messages = &self.received_messages;
@@ -1121,7 +1165,17 @@ impl WebSocketTabState
 
         self.received_messages.prepend(&tv);
 
+        self.pipeline_message_count_decrementor.dec();
+
         self.regulate_received_messages();
+
+        self.received_messages.queue_draw(); //.activate();
+
+        //self.received_messages.bind_property(source_property, target, target_property)
+
+        //self.received_messages.realize() //.queue_resize();
+
+        //self.received_messages.activate();
 
     }
 
