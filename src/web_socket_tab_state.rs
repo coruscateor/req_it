@@ -15,6 +15,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use corlib::text::AsStr;
+use gtk_estate::adw::gio::ListStore;
 use gtk_estate::adw::glib::clone::Upgrade;
 
 //use gtk_estate::corlib::rfc::borrow_mut;
@@ -24,7 +25,10 @@ use gtk_estate::adw::glib::clone::Upgrade;
 use corlib::upgrading::{up_rc, up_rc_pt};
 
 use gtk_estate::adw::prelude::{Cast, ObjectExt};
-use gtk_estate::gtk4::{Align, ListBox, StringObject};
+
+//use gtk_estate::gtk4::traits::ListBoxRowExt;
+
+use gtk_estate::gtk4::{Align, BoxLayout, ListBox, ListBoxRow, StringObject, Widget};
 
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
 
@@ -86,6 +90,8 @@ use tokio::sync::mpsc::error::TryRecvError;
 use crate::actors::{ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage};
 
 use gtk_estate::gtk4::gio::ListModel;
+
+use gtk_estate::gtk4::prelude::ListBoxRowExt;
 
 //type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
 
@@ -293,8 +299,11 @@ pub struct WebSocketTabState
 
     //received_text: TextView,
 
-    received_messages: Box, //ListBox,
-    received_messages_child_observer: ListModel,
+    //received_messages: Box, //ListBox,
+    //received_messages_child_observer: ListModel,
+
+    received_messages_presenter: ListBox,
+    received_messages: ListStore,
 
     //Bottom Right
 
@@ -591,17 +600,72 @@ impl WebSocketTabState
 
         //let received_text = TextView::new();
 
-        let received_messages = Box::new(Orientation::Vertical, 10); //ListBox::new();
+        //let received_messages = Box::new(Orientation::Vertical, 10); //ListBox::new();
 
-        received_messages.set_vexpand(true);
+        let received_messages_presenter = ListBox::new();
 
-        received_messages.set_margin_top(20);
+        received_messages_presenter.set_vexpand(true);
 
-        received_messages.set_valign(Align::Start);
+        received_messages_presenter.set_margin_top(20);
 
-        let received_messages_child_observer = received_messages.observe_children();
+        //received_messages_pesenter.set_valign(Align::Start);
 
-        let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_messages).build();
+        //let received_messages_child_observer = received_messages.observe_children();
+
+        let received_messages = ListStore::new::<ListBoxRow>(); //<Text>();
+
+        received_messages_presenter.bind_model(Some(&received_messages), |obj|
+        {
+
+            //Not being called
+
+            let row = ListBoxRow::new();
+
+            match obj.downcast_ref::<Widget>()
+            {
+
+                Some(val) =>
+                {
+
+                    row.set_child(Some(val)); //.clone()
+
+                }
+                None =>
+                {
+
+                    let txt = Text::builder().editable(false).text("Error: Could not convert to Widget.").build(); //.upcast()
+
+                    row.set_child(Some(&txt));
+
+                }
+
+            }
+
+            row.into()
+
+            /*
+            match obj.downcast_ref::<Widget>()
+            {
+
+                Some(val) =>
+                {
+
+                    val.clone()
+
+                }
+                None =>
+                {
+
+                    Text::builder().editable(false).text("Error: Could not convert to Widget.").build().upcast()
+
+                }
+
+            }
+            */
+
+        });
+
+        let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_messages_presenter).build();
 
         set_hvexpand_t(&recived_messages_scrolled_window);
 
@@ -609,6 +673,10 @@ impl WebSocketTabState
 
         received_paned.set_start_child(Some(&recived_messages_scrolled_window));
 
+        let box_layout = BoxLayout::builder().orientation(Orientation::Vertical).spacing(10).build();
+
+        received_paned.set_layout_manager(Some(box_layout));
+        
         //End Child - Lower right
 
         /*
@@ -705,8 +773,9 @@ impl WebSocketTabState
                 //Bottom Right
 
                 //tracing_text,
+                received_messages_presenter,
                 received_messages,
-                received_messages_child_observer,
+                //received_messages_child_observer,
 
                 //
                 
@@ -1138,6 +1207,16 @@ impl WebSocketTabState
 
         let limit = 20; //500;
 
+        let n_items = self.received_messages.n_items();
+
+        if n_items > limit
+        {
+
+            self.received_messages.remove(n_items - 1);
+
+        }
+
+        /*
         if self.received_messages_child_observer.n_items() == limit
         {
 
@@ -1153,6 +1232,7 @@ impl WebSocketTabState
             }
 
         }
+        */
 
     }
 
@@ -1163,13 +1243,48 @@ impl WebSocketTabState
 
         tv.buffer().set_text(message);
 
-        self.received_messages.prepend(&tv);
+        /*
+        let n_items = self.received_messages.n_items();
+
+        let position;
+
+        if n_items == 0
+        {
+
+            position = n_items;
+
+        }
+        else
+        {
+
+            position = n_items - 1;
+
+        }
+        */
+
+        //self.received_messages.insert(0, &tv);
+
+        let row = ListBoxRow::new();
+
+        row.set_child(Some(&tv));
+
+        self.received_messages.insert(0, &row);
+
+        row.activate();
+
+        //row.set_visible(true); //.show();
+
+        //self.received_messages.append(&tv);
+
+        //self.received_messages.append(&row);
+
+        //self.received_messages.prepend(&tv);
 
         self.pipeline_message_count_decrementor.dec();
 
         self.regulate_received_messages();
 
-        self.received_messages.queue_draw(); //.activate();
+        //self.received_messages.queue_draw(); //.activate();
 
         //self.received_messages.bind_property(source_property, target, target_property)
 

@@ -14,7 +14,7 @@ categories = ["web-programming::http-client"]
 
 [dependencies]
 #gtk_estate = { path="../gtk_estate", features = ["adw"] } #Do not remove
-gtk_estate = { version = "0.3.0", features = ["adw"] }
+gtk_estate = { version = "0.3.0", features = ["adw", "gtk_v4_14"] }
 reqwest = { version = "0.11.*", features = [ "json" ] }
 act_rs = { path="../act_rs", features = ["tokio"] } #Do not remove
 #act_rs = "0.1.0"
