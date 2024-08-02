@@ -33,7 +33,7 @@ impl Incrementor
     pub fn count(&self) -> u64
     {
 
-        self.count.load(Ordering::SeqCst) //Ordering::Acquire)
+        self.count.load(Ordering::Acquire)//Ordering::SeqCst) //Ordering::Acquire)
 
     }
 
@@ -85,7 +85,7 @@ impl Decrementor
     pub fn count(&self) -> u64
     {
 
-        self.count.load(Ordering::SeqCst) //Ordering::Acquire)
+        self.count.load(Ordering::Acquire) //Ordering::SeqCst) //Ordering::Acquire)
 
     }
     

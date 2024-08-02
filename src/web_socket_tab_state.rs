@@ -14,7 +14,7 @@ use std::sync::OnceLock;
 
 use std::time::Duration;
 
-use corlib::text::AsStr;
+use corlib::text::{AsStr, SendableText, SendableTextLog, SendableTextLogWithBuffer};
 use gtk_estate::adw::gio::ListStore;
 use gtk_estate::adw::glib::clone::Upgrade;
 
@@ -46,7 +46,7 @@ use gtk_estate::corlib::{impl_as_any, AsAny};
 
 //use corlib::upgrading::up_rc;
 
-use corlib::rfc::{borrow, borrow_mut};
+use corlib::rfc::{borrow, borrow_mut, borrow_mut_param};
 
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
@@ -245,8 +245,10 @@ struct MutState
 {
 
     pub connection_status: ConnectionStatus,
-    pub processing_format: ProcessingFormat
-
+    pub processing_format: ProcessingFormat,
+    //pub received_log: SendableTextLog,
+    //pub opt_received_log_cache: Option<String>
+    pub received_log: SendableTextLogWithBuffer
 }
 
 impl MutState
@@ -259,7 +261,10 @@ impl MutState
         {
 
             connection_status: ConnectionStatus::NotConnected,
-            processing_format: ProcessingFormat::Text
+            processing_format: ProcessingFormat::Text,
+            //received_log: SendableTextLog::with_capacity(20),
+            //opt_received_log_cache: Some(String::with_capacity(10000))
+            received_log: SendableTextLogWithBuffer::with_capacity_and_buffer(20, String::with_capacity(10000))
 
         }
 
@@ -302,14 +307,16 @@ pub struct WebSocketTabState
     //received_messages: Box, //ListBox,
     //received_messages_child_observer: ListModel,
 
-    received_messages_presenter: ListBox,
-    received_messages: ListStore,
+    //received_messages_presenter: ListBox,
+    //received_messages: ListStore,
 
     //Bottom Right
 
     //tracing_text: TextView,
 
     //
+
+    received_log: TextView,
 
     contents_paned: Paned,
     to_be_sent_paned: Paned,
@@ -602,6 +609,7 @@ impl WebSocketTabState
 
         //let received_messages = Box::new(Orientation::Vertical, 10); //ListBox::new();
 
+        /*
         let received_messages_presenter = ListBox::new();
 
         received_messages_presenter.set_vexpand(true);
@@ -664,8 +672,13 @@ impl WebSocketTabState
             */
 
         });
+        */
 
-        let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_messages_presenter).build();
+        //let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_messages_presenter).build();
+
+        let received_log = TextView::builder().sensitive(false).build();
+
+        let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_log).build();
 
         set_hvexpand_t(&recived_messages_scrolled_window);
 
@@ -773,11 +786,13 @@ impl WebSocketTabState
                 //Bottom Right
 
                 //tracing_text,
-                received_messages_presenter,
-                received_messages,
+                //received_messages_presenter,
+                //received_messages,
                 //received_messages_child_observer,
 
                 //
+
+                received_log,
                 
                 contents_paned,
                 to_be_sent_paned,
@@ -818,7 +833,9 @@ impl WebSocketTabState
 
                     //display error
 
-                    this.output_message("Error: no address provided.");
+                    //this.output_message("Error: no address provided.");
+
+                    this.update_received_output(SendableText::Str("Error: no address provided."));
 
                     return;
 
@@ -921,7 +938,9 @@ impl WebSocketTabState
     
                         //panic!("Error: Could not contact web_socket_actor.");
     
-                        this.output_message("Error: Could not contact WriteFrameProcessorActor.");
+                        //this.output_message("Error: Could not contact WriteFrameProcessorActor.");
+
+                        this.update_received_output(SendableText::Str("Error: Could not contact WriteFrameProcessorActor."));
 
                         return;
 
@@ -1038,7 +1057,9 @@ impl WebSocketTabState
 
                                 //this.pipeline_message_count_decrementor.dec();
 
-                                this.output_message(&processed_text);
+                                //this.output_message(&processed_text);
+
+                                this.update_received_output(SendableText::String(processed_text));
 
                             },
                             ReadFrameProcessorActorOutputMessage::ClientMessage(message) =>
@@ -1054,11 +1075,13 @@ impl WebSocketTabState
 
                                         //Post connect_button.connect_clicked
 
-                                        this.output_message(&message); //.as_str());
+                                        //this.output_message(&message); //.as_str());
 
                                         //this.connect_button.set_visible(false);
 
                                         //this.disconnect_button.set_visible(true);
+
+                                        this.update_received_output(message);
 
                                         this.set_status(ConnectionStatus::Connected);
 
@@ -1068,7 +1091,9 @@ impl WebSocketTabState
 
                                         //mut_state.connection_status = ConnectionStatus::NotConnected;
 
-                                        this.output_message(&message);
+                                        //this.output_message(&message);
+
+                                        this.update_received_output(message);
 
                                         this.set_status(ConnectionStatus::NotConnected);
 
@@ -1080,7 +1105,9 @@ impl WebSocketTabState
 
                                         //Post disconnect_button.connect_clicked
 
-                                        this.output_message(&message); //.as_str());
+                                        //this.output_message(&message); //.as_str());
+
+                                        this.update_received_output(message);
 
                                         this.set_status(ConnectionStatus::NotConnected);
 
@@ -1090,7 +1117,9 @@ impl WebSocketTabState
 
                                         //mut_state.connection_status = ConnectionStatus::NotConnected;
 
-                                        this.output_message(&message);
+                                        //this.output_message(&message);
+
+                                        this.update_received_output(message);
 
                                         this.set_status(ConnectionStatus::NotConnected);
 
@@ -1100,7 +1129,9 @@ impl WebSocketTabState
 
                                         //mut_state.connection_status = ConnectionStatus::Disconnecting;
 
-                                        this.output_message(&message);
+                                        //this.output_message(&message);
+
+                                        this.update_received_output(message);
 
                                         this.set_status(ConnectionStatus::Disconnecting);
 
@@ -1108,7 +1139,9 @@ impl WebSocketTabState
                                     WebSocketActorOutputClientMessage::PingFrameReceived(message) | WebSocketActorOutputClientMessage::PongFrameReceived(message) | WebSocketActorOutputClientMessage::CloseFrameReceived(message) =>
                                     {
 
-                                        this.output_message(&message);
+                                        //this.output_message(&message);
+
+                                        this.update_received_output(message);
 
                                     }
 
@@ -1202,6 +1235,7 @@ impl WebSocketTabState
 
     }
 
+    /*
     fn regulate_received_messages(&self)
     {
 
@@ -1235,13 +1269,67 @@ impl WebSocketTabState
         */
 
     }
+    */
 
+    fn update_received_output(&self, message: SendableText)
+    {
+
+        /*
+        borrow_mut_param(&self.mut_state, (self, message), |mut mut_state|
+        {
+
+            mut_state.received_log.push(message);
+
+        });
+        */
+
+        let mut mut_state = self.mut_state.borrow_mut();
+
+        mut_state.received_log.push(message);
+
+        self.received_log.buffer().set_text(&mut_state.received_log.buffer());
+
+        /*
+        match mut_state.opt_received_log_cache.take()
+        {
+
+            Some(mut res) =>
+            {
+
+                mut_state.received_log.overwrite(&mut res);
+
+                self.received_log.buffer().set_text(&res);
+
+                mut_state.opt_received_log_cache = Some(res);
+
+            }
+            None =>
+            {
+
+                let mut new_string = String::with_capacity(1000);
+
+                mut_state.received_log.overwrite(&mut new_string);
+
+                self.received_log.buffer().set_text(&new_string);
+
+                mut_state.opt_received_log_cache = Some(new_string);
+
+            }
+
+        }
+
+        self.pipeline_message_count_decrementor.dec();
+        */
+
+    }
+
+    /*
     fn output_message(&self, message: &str)
     {
 
-        let tv = TextView::builder().editable(false).build();
+        //let tv = TextView::builder().editable(false).build();
 
-        tv.buffer().set_text(message);
+        //tv.buffer().set_text(message);
 
         /*
         let n_items = self.received_messages.n_items();
@@ -1264,13 +1352,13 @@ impl WebSocketTabState
 
         //self.received_messages.insert(0, &tv);
 
-        let row = ListBoxRow::new();
+        //let row = ListBoxRow::new();
 
-        row.set_child(Some(&tv));
+        //row.set_child(Some(&tv));
 
-        self.received_messages.insert(0, &row);
+        //self.received_messages.insert(0, &row);
 
-        row.activate();
+        //row.activate();
 
         //row.set_visible(true); //.show();
 
@@ -1282,7 +1370,7 @@ impl WebSocketTabState
 
         self.pipeline_message_count_decrementor.dec();
 
-        self.regulate_received_messages();
+        //self.regulate_received_messages();
 
         //self.received_messages.queue_draw(); //.activate();
 
@@ -1293,6 +1381,7 @@ impl WebSocketTabState
         //self.received_messages.activate();
 
     }
+    */
 
     fn set_status(&self, status: ConnectionStatus)
     {
