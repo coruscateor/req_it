@@ -676,7 +676,7 @@ impl WebSocketTabState
 
         //let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_messages_presenter).build();
 
-        let received_log = TextView::builder().sensitive(false).build();
+        let received_log = TextView::builder().editable(false).build(); //sensitive(false).build();
 
         let recived_messages_scrolled_window = ScrolledWindow::builder().child(&received_log).build();
 
@@ -686,9 +686,9 @@ impl WebSocketTabState
 
         received_paned.set_start_child(Some(&recived_messages_scrolled_window));
 
-        let box_layout = BoxLayout::builder().orientation(Orientation::Vertical).spacing(10).build();
+        //let box_layout = BoxLayout::builder().orientation(Orientation::Vertical).spacing(10).build();
 
-        received_paned.set_layout_manager(Some(box_layout));
+        //received_paned.set_layout_manager(Some(box_layout));
         
         //End Child - Lower right
 
@@ -1284,6 +1284,8 @@ impl WebSocketTabState
         */
 
         let mut mut_state = self.mut_state.borrow_mut();
+
+        mut_state.received_log.push_only(SendableText::Str("\n\n"));
 
         mut_state.received_log.push(message);
 

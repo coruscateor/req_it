@@ -383,12 +383,19 @@ impl WebSocketActorState
 
         let url_str = url.as_str();
 
-        let connection_stream = TcpStream::connect(url_str).await?;
+        //let connection_stream = TcpStream::connect(url_str).await?;
+
+        let connection_stream = TcpStream::connect("localhost:3000").await?; //"0.0.0.0:3000").await?;
 
         let request = Request::builder()
             .method("GET")
-            .uri(url_str)
-            .header("Host", url_str)
+            //.uri(url_str)
+            //.header("Host", url_str)
+            //.uri("http://0.0.0.0:3000")
+            //.header("Host", "0.0.0.0:3000")
+            //.uri("http://localhost:3000")
+            .uri("localhost:3000/")
+            .header("Host", "localhost:3000")
             .header(UPGRADE, "websocket")
             .header(CONNECTION, "upgrade")
             .header("Sec-WebSocket-Key", handshake::generate_key())
