@@ -111,71 +111,6 @@ impl OwnedFrame
 
     }
 
-    /*
-    pub fn copy_into_frame(&mut self, frame: &mut Frame<'_>)
-    {
-
-        frame.fin = self.fin;
-
-        frame.opcode = self.opcode;
-
-        //self.payload
-
-        //let vec
-
-        match &mut frame.payload
-        {
-
-            Payload::BorrowedMut(val) =>
-            {
-
-                frame.payload = Payload::Owned(val.to_vec());
-
-            },
-            Payload::Borrowed(val) =>
-            {
-
-                frame.payload = Payload::Owned(val.to_vec());
-
-            },
-            fastwebsockets::Payload::Owned(val) =>
-            {
-
-                //val.clear();
-
-                let payload = &mut self.payload;
-
-                //let val_capacity = val.capacity();
-
-                //let payload_capacity = payload.capacity();
-
-                let payload_len = payload.len();
-
-                //if val.len() < payload_len //val.capacity() < payload_capacity
-                //{
-
-                    //val.resize(payload_len, 0); //payload_capacity, 0);
-
-                //}
-
-                val.resize(payload_len, 0);
-
-                val.copy_from_slice(&payload);
-                
-                
-            },
-            fastwebsockets::Payload::Bytes(val) =>
-            {
-
-                frame.payload = Payload::Owned(val.to_vec());
-
-            }
-
-        }
-
-    }
-    */
-
     pub fn setup_frame_to_be_written<'f>(&'f mut self, frame: &mut Frame<'f>)
     {
 
@@ -195,6 +130,89 @@ impl OwnedFrame
         self.setup_frame_to_be_written(&mut frame);
 
         frame
+
+    }
+
+    //Valid opcode and fin field arrangements.
+
+    pub fn continuation_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Continuation;
+
+        self.fin = false;
+
+    }
+
+    pub fn final_continuation_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Continuation;
+
+        self.fin = true;
+
+    }
+
+    pub fn text_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Text;
+
+        self.fin = true;
+
+    }
+
+    pub fn text_continuation_stater_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Text;
+
+        self.fin = false;
+
+    }
+
+    pub fn binary_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Binary;
+
+        self.fin = true;
+
+    }
+
+    pub fn binary_continuation_stater_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Binary;
+
+        self.fin = false;
+
+    }
+
+    pub fn close_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Close;
+
+        self.fin = true;
+
+    }
+
+    pub fn ping_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Ping;
+
+        self.fin = true;
+
+    }
+
+    pub fn pong_setup(&mut self)
+    {
+
+        self.opcode = OpCode::Pong;
+
+        self.fin = true;
 
     }
 

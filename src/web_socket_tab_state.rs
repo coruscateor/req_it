@@ -902,7 +902,7 @@ impl WebSocketTabState
             up_rc(&weak_self, |this|
             {
 
-                let address_text_buffer = this.address_text.buffer();
+                //let address_text_buffer = this.address_text.buffer();
 
                 let res = borrow(&this.mut_state, |mut_state|
                 {
@@ -931,7 +931,7 @@ impl WebSocketTabState
                 if res.is_active()
                 {
 
-                    if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::ConnectTo(address_text_buffer.text().into()))
+                    if let Err(_err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::Disconnect) //WebSocketActorInputMessage::ConnectTo(address_text_buffer.text().into()))
                     {
     
                         //Error: Could not contact web_socket_actor.
@@ -1030,6 +1030,26 @@ impl WebSocketTabState
 
             });
 
+
+        });
+
+        let weak_self = this.adapted_contents_box.weak_parent();
+
+        this.send_ping_button.connect_clicked(move |_btn|
+        {
+
+            up_rc(&weak_self, |this|
+            {
+    
+                if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::SendPing)
+                {
+
+                    panic!("{}", err)
+
+                }
+
+
+            });
 
         });
 

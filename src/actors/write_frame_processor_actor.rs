@@ -192,7 +192,13 @@ impl WriteFrameProcessorActorState
                         ProcessingFormat::Text =>
                         {
 
-                            of.opcode = OpCode::Text;
+                            //of.opcode = OpCode::Text;
+
+                            //Make sure to set the fin field.
+
+                            //of.fin = false;
+
+                            of.text_setup();
 
                             //Set the payload of the OwnedFrame the right size.
         

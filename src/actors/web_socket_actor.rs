@@ -88,7 +88,7 @@ static PING_FRAME_SENT: &str = "Ping frame sent.";
 
 static PONG_FRAME_RECEIVED: &str = "Pong frame received.";
 
-static CLOSE_FRAME_RECEIVED: &str = "Close frame received (Close frame sent automatically)";
+static CLOSE_FRAME_RECEIVED: &str = "Close frame received"; //"Close frame received (Close frame sent automatically)";
 
 //static CONNECTION_FAILED: &str = "Connection Faild!";
 
@@ -385,24 +385,39 @@ impl WebSocketActorState
 
         //let connection_stream = TcpStream::connect(url_str).await?;
 
-        let connection_stream = TcpStream::connect("localhost:3000").await?; //"0.0.0.0:3000").await?;
+        //let connection_stream = TcpStream::connect("localhost:3000").await?; //"0.0.0.0:3000").await?;
+
+        let connection_stream = TcpStream::connect("0.0.0.0:3000").await?; 
+
+        println!("connection_stream\n");
+
+        println!("{connection_stream:?}\n");
 
         let request = Request::builder()
             .method("GET")
             //.uri(url_str)
             //.header("Host", url_str)
             //.uri("http://0.0.0.0:3000")
-            //.header("Host", "0.0.0.0:3000")
+            //.uri("/")
+            //.uri("0.0.0.0:3000")
+            .uri("ws://0.0.0.0:3000")
+            .header("Host", "0.0.0.0:3000")
             //.uri("http://localhost:3000")
-            .uri("localhost:3000/")
-            .header("Host", "localhost:3000")
+            //.uri("localhost:3000/")
+            //.header("Host", "localhost:3000")
             .header(UPGRADE, "websocket")
             .header(CONNECTION, "upgrade")
             .header("Sec-WebSocket-Key", handshake::generate_key())
-            .header("Sec-WebSocket-Verion", "13")
+            .header("Sec-WebSocket-Version", "13") //"Sec-WebSocket-Verion" OMG!!!!!!
             .body(Empty::<Bytes>::new())?;
 
+            println!("request\n");
+
+            println!("{request:?}");
+
         let (ws, res) = handshake::client(&SpawnExecutor, request, connection_stream).await?;
+
+        println!("{res:?}");
 
         Ok((ws, res))
 
@@ -584,6 +599,8 @@ impl WebSocketActorState
 
                         self.pipline_output_count_incrementor.inc();
 
+                        break;
+
                     }
 
                 }
@@ -686,6 +703,8 @@ impl WebSocketActorState
             },
             Err(err) =>
             {
+
+                //println!("{err:?}");
 
                 let err_string = err.to_string();
 
