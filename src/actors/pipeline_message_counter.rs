@@ -1,6 +1,7 @@
 
 use std::sync::{atomic::{AtomicU64, Ordering}, Arc};
 
+#[derive(Clone)]
 pub struct Incrementor
 {
 
@@ -53,6 +54,7 @@ impl Incrementor
 
 }
 
+#[derive(Clone)]
 pub struct Decrementor
 {
 

@@ -4,9 +4,9 @@ use fastwebsockets::OpCode;
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
-use super::{ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage}; //, WebSocketActorOutputMessage};
+use super::{pipeline_message_counter::Decrementor, OwnedFrame, ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage}; //, WebSocketActorOutputMessage};
 
-use std::{rc::Rc, sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}};
+use std::{borrow::Cow, rc::Rc, sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}};
 
 use act_rs::ActorFrontend;
 
@@ -28,14 +28,14 @@ pub struct ReadFrameProcessorActorState
 
     //io_client: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //Should really only be on the "client side".
     io_server: ActorIOServer<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
-    in_the_read_pipeline_count: Arc<AtomicUsize>
+    in_the_read_pipeline_count: Decrementor //Arc<AtomicUsize>
 
 }
 
 impl ReadFrameProcessorActorState
 {
 
-    pub fn new(in_the_read_pipeline_count: &Arc<AtomicUsize>) -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(in_the_read_pipeline_count: Decrementor) -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //&Arc<AtomicUsize> //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         /*
@@ -59,13 +59,13 @@ impl ReadFrameProcessorActorState
 
             //io_client,
             io_server,
-            in_the_read_pipeline_count: in_the_read_pipeline_count.clone()
+            in_the_read_pipeline_count //: in_the_read_pipeline_count.clone()
 
         })
 
     }
 
-    pub fn spawn(in_the_read_pipeline_count: &Arc<AtomicUsize>) -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>
+    pub fn spawn(in_the_read_pipeline_count: Decrementor) -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage> //&Arc<AtomicUsize>
     {
 
         let (io_client, state) = ReadFrameProcessorActorState::new(in_the_read_pipeline_count);
@@ -86,7 +86,7 @@ impl ReadFrameProcessorActorState
         if let Some(message) = self.io_server.input_receiver().recv().await //.input_receiver.recv().await
         {
 
-            let output;
+            //let output;
 
             match message
             {
@@ -94,28 +94,7 @@ impl ReadFrameProcessorActorState
                 ReadFrameProcessorActorInputMessage::Frame(frame) =>
                 {
 
-                    if frame.opcode == OpCode::Text
-                    {
-        
-                        //let opcode = format!("{}", frame.opcode);
-
-                        let payload_as_utf8 = String::from_utf8_lossy(&frame.payload);
-
-                        output = format!("{{fin: {fin},\nopcode: {opcode:?},\npayload_as_utf8: {payload_as_utf8}}}", fin = frame.fin, opcode = frame.opcode)
-        
-                    }
-                    else if frame.opcode == OpCode::Binary || frame.opcode == OpCode::Continuation
-                    {
-
-                        output = format!("{{fin: {fin},\nopcode: {opcode:?},\npayload {payload:?}}}", fin = frame.fin, opcode = frame.opcode, payload = frame.payload)
-
-                    }
-                    else
-                    {
-
-                        output = format!("{{fin: {fin},\nopcode: {opcode:?},\npayload {payload:?}}}", fin = frame.fin, opcode = frame.opcode, payload = frame.payload)
-                        
-                    }
+                    let output = Self::format_output(frame);
 
                     if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await
                     {
@@ -124,7 +103,7 @@ impl ReadFrameProcessorActorState
 
                     }
 
-                    self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
+                    //.fetch_sub(1, Ordering::SeqCst);
 
                 }
                 ReadFrameProcessorActorInputMessage::ClientMessage(message) =>
@@ -140,14 +119,111 @@ impl ReadFrameProcessorActorState
                     }
 
                 }
+                ReadFrameProcessorActorInputMessage::FrameAndMessage(frame, message) =>
+                {
+
+                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::ClientMessage(message)).await
+                    {
+
+                        return false;
+
+                    }
+
+                    let output = Self::format_output(frame);
+
+                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await
+                    {
+
+                        return false;
+
+                    }
+
+                    //self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
+
+                }
                 
             }
+
+            self.in_the_read_pipeline_count.dec();
 
             return true;
 
         }
 
         false
+
+    }
+
+    fn format_output(frame: OwnedFrame) -> String
+    {
+
+        #[derive(Debug)]
+        enum PayloadOutput<'a>
+        {
+
+            Text(Cow<'a, str>),
+            Binary(&'a Vec<u8>)
+
+        }
+
+        let payload_output;
+
+        if frame.payload.is_empty()
+        {
+
+            payload_output = None;
+
+        }
+        else
+        {
+
+            match frame.opcode
+            {
+                
+                OpCode::Text =>
+                {
+
+                    //Output u8 only option?
+                    
+                    let payload_as_utf8 = String::from_utf8_lossy(&frame.payload);
+    
+                    payload_output = Some(PayloadOutput::Text(payload_as_utf8));
+    
+                }
+                OpCode::Binary =>
+                {
+    
+                    //Format as a particular type (JSON)?
+                    
+                    payload_output = Some(PayloadOutput::Binary(&frame.payload));
+    
+                }
+                OpCode::Continuation =>
+                {
+    
+                    payload_output = Some(PayloadOutput::Binary(&frame.payload));
+    
+                }
+                OpCode::Close | OpCode::Ping | OpCode::Pong =>
+                {
+
+                    //Also interpret in other ways?
+
+                    let payload_as_utf8 = String::from_utf8_lossy(&frame.payload);
+    
+                    payload_output = Some(PayloadOutput::Text(payload_as_utf8));
+
+                }
+                /*
+                OpCode::Close => todo!(),
+                OpCode::Ping => todo!(),
+                OpCode::Pong => todo!(),
+                */
+            }
+            
+        }
+
+        format!("{{fin: {fin},\nopcode: {opcode:?},\npayload {payload:?}}}", fin = frame.fin, opcode = frame.opcode, payload = payload_output)
 
     }
 

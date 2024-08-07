@@ -14,6 +14,7 @@ use tokio::task::JoinHandle;
 
 use paste::paste;
 
+use super::pipeline_message_counter::{inc_dec, Decrementor};
 use super::{ProcessingFormat, ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
 
 //WebSocketActorOutputMessage,
@@ -21,6 +22,8 @@ use super::{ProcessingFormat, ReadFrameProcessorActorInputMessage, ReadFrameProc
 use super::OwnedFrame;
 
 use crate::actors::pipeline_message_counter::Incrementor;
+
+use delegate::delegate;
 
 #[derive(Clone)]
 pub struct WriteFrameProcessorActorIOClient
@@ -32,13 +35,14 @@ pub struct WriteFrameProcessorActorIOClient
     //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
     read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
     //in_the_read_pipeline_count: Arc<AtomicUsize>
+    pipeline_message_count_decrementor: Decrementor
 
 }
 
 impl WriteFrameProcessorActorIOClient
 {
 
-    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_input_sender: Sender<WebSocketActorInputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>) -> Self  //, incrementor: Incrementor) -> Self  //in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
+    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_input_sender: Sender<WebSocketActorInputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, pipeline_message_count_decrementor: Decrementor) -> Self  //, incrementor: Incrementor) -> Self  //in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
     {
 
         Self
@@ -50,6 +54,7 @@ impl WriteFrameProcessorActorIOClient
             web_socket_input_sender,
             read_frame_actor_io_client,
             //in_the_read_pipeline_count //: in_the_read_pipeline_count.clone()
+            pipeline_message_count_decrementor
 
         }
 
@@ -64,6 +69,14 @@ impl WriteFrameProcessorActorIOClient
     impl_get_ref!(web_socket_input_sender, Sender<WebSocketActorInputMessage>);
 
     impl_get_ref!(read_frame_actor_io_client, ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>);
+
+    delegate! {
+        to self.pipeline_message_count_decrementor {
+
+            pub fn has_messages(&self) -> bool;
+
+        }
+    }
 
     /*
     pub fn read_frame_proccessor_output_receiver(&self) -> &Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>
@@ -107,10 +120,12 @@ pub struct WriteFrameProcessorActorState
 impl WriteFrameProcessorActorState
 {
 
-    pub fn new(incrementor: Incrementor) -> (WriteFrameProcessorActorIOClient, Self) //client_sender_ouput: Sender<WebSocketActorOutputMessage>) -> Self
+    pub fn new() -> (WriteFrameProcessorActorIOClient, Self) //incrementor: Incrementor //client_sender_ouput: Sender<WebSocketActorOutputMessage>) -> Self
     {
 
         let (sender, receiver) = channel(1000);
+
+        let (pipeline_message_count_incrementor, pipeline_message_count_decrementor) = inc_dec();
 
         //let (read_frame_proccessor_input_sender, read_frame_proccessor_input_receiver) = channel(1000);
 
@@ -118,11 +133,11 @@ impl WriteFrameProcessorActorState
 
         //let (read_frame_proccessor_input_sender, read_frame_proccessor_input_receiver) = channel(1000);
 
-        let in_the_read_pipeline_count = Arc::new(AtomicUsize::new(0));
+        //let in_the_read_pipeline_count = Arc::new(AtomicUsize::new(0));
 
         //Last Stage
 
-        let read_frame_processor_actor_io_client = ReadFrameProcessorActorState::spawn(&in_the_read_pipeline_count); //read_frame_proccessor_input_receiver));
+        let read_frame_processor_actor_io_client = ReadFrameProcessorActorState::spawn(pipeline_message_count_decrementor.clone()); //&in_the_read_pipeline_count); //read_frame_proccessor_input_receiver));
 
         //let read_frame_proccessor_output_receiver = read_frame_processor_actor.interactor().clone();
 
@@ -130,13 +145,13 @@ impl WriteFrameProcessorActorState
 
         //Second Stage
 
-        let web_socket_input_sender= WebSocketActorState::spawn(read_frame_processor_actor_io_client.clone(), incrementor); //&in_the_read_pipeline_count); //WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor)); 
+        let web_socket_input_sender= WebSocketActorState::spawn(read_frame_processor_actor_io_client.clone(), pipeline_message_count_incrementor); //incrementor); //&in_the_read_pipeline_count); //WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor)); 
 
         //let web_socket_actor_io_client = WebSocketActorState::spawn(read_frame_processor_actor_io_client.clone(), &in_the_read_pipeline_count); //WebSocketActor::new(WebSocketActorState::new(read_frame_processor_actor)); //, read_frame_proccessor_input_sender));
 
         //First Stage
 
-        let actor_io_client = WriteFrameProcessorActorIOClient::new(sender, web_socket_input_sender.clone(), read_frame_processor_actor_io_client); //, in_the_read_pipeline_count); //read_frame_processor_actor_interactor); //read_frame_proccessor_output_receiver);
+        let actor_io_client = WriteFrameProcessorActorIOClient::new(sender, web_socket_input_sender.clone(), read_frame_processor_actor_io_client, pipeline_message_count_decrementor); //, in_the_read_pipeline_count); //read_frame_processor_actor_interactor); //read_frame_proccessor_output_receiver);
 
         //web_socket_actor_io_client.clone(),
 
@@ -155,10 +170,10 @@ impl WriteFrameProcessorActorState
 
     }
 
-    pub fn spawn(incrementor: Incrementor) -> WriteFrameProcessorActorIOClient
+    pub fn spawn() -> WriteFrameProcessorActorIOClient //incrementor: Incrementor
     {
 
-        let (actor_io_client, state) = WriteFrameProcessorActorState::new(incrementor);
+        let (actor_io_client, state) = WriteFrameProcessorActorState::new(); //incrementor);
 
         WriteFrameProcessorActor::spawn(state);
 

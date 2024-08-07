@@ -327,11 +327,12 @@ pub struct WebSocketTabState
     tokio_rt_handle: Handle,
 
     web_socket_actor_poller: RcSimpleTimeOut<Weak<WebSocketTabState>>,
-    send_ping_button: Button,
+    ping_button: Button,
+    ping_zero_button: Button,
     connected_address_text: Text,
     connection_status_text: Text,
     mut_state: RefCell<MutState>,
-    pipeline_message_count_decrementor: Decrementor
+    //pipeline_message_count_decrementor: Decrementor
 
 }
 
@@ -397,7 +398,7 @@ impl WebSocketTabState
 
         //Left
 
-        let tool_left_box = Box::new(Orientation::Horizontal, 40);
+        let tool_left_box = Box::new(Orientation::Horizontal, 5);
 
         tool_left_box.set_margin_end(10);
 
@@ -410,6 +411,24 @@ impl WebSocketTabState
         let format_dropdown = DropDown::from_strings(FORMAT_DROPDOWN_STRS);
 
         tool_left_box.append(&format_dropdown);
+
+        //ping
+
+        let ping_button = Button::builder().label("Ping").build();
+
+        //send_ping_button.set_halign(Align::Center);
+
+        //send_ping_button.set_halign(Align::End);
+
+        //send_ping_button.set_hexpand(true);
+
+        ping_button.set_sensitive(false);
+
+        tool_left_box.append(&ping_button);
+
+        //ping_zero
+
+        let ping_zero_button = Button::builder().label("Ping \"0\"").build();
 
         //Send Button
 
@@ -491,11 +510,13 @@ impl WebSocketTabState
 
         //The ping button
 
+        /*
         let send_ping_button = Button::builder().label("Ping").build();
 
         send_ping_button.set_sensitive(false);
 
         tool_right_box.append(&send_ping_button);
+        */
 
         //
 
@@ -732,9 +753,9 @@ impl WebSocketTabState
 
         //For counting messages in the read side of the pipeline.
 
-        let (pipeline_message_count_incrementor, pipeline_message_count_decrementor) = inc_dec();
+        //let (pipeline_message_count_incrementor, pipeline_message_count_decrementor) = inc_dec();
 
-        let write_frame_processor_actor_io_client = enter!(tokio_rt_handle, WriteFrameProcessorActorState::spawn(pipeline_message_count_incrementor));
+        let write_frame_processor_actor_io_client = enter!(tokio_rt_handle, WriteFrameProcessorActorState::spawn()); //pipeline_message_count_incrementor));
 
         //let web_socket_actor 
         
@@ -802,11 +823,12 @@ impl WebSocketTabState
                 write_frame_processor_actor_io_client,
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
                 web_socket_actor_poller: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
-                send_ping_button,
+                ping_button,
+                ping_zero_button,
                 connected_address_text,
                 connection_status_text,
                 mut_state: RefCell::new(MutState::new()),
-                pipeline_message_count_decrementor
+                //pipeline_message_count_decrementor
 
             }
 
@@ -1035,13 +1057,15 @@ impl WebSocketTabState
 
         let weak_self = this.adapted_contents_box.weak_parent();
 
-        this.send_ping_button.connect_clicked(move |_btn|
+        this.ping_button.connect_clicked(move |_btn|
         {
 
             up_rc(&weak_self, |this|
             {
+
+                let tv_string = get_text_view_string(&this.to_be_sent_text);
     
-                if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::SendPing)
+                if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::SendPing(tv_string))
                 {
 
                     panic!("{}", err)
@@ -1052,6 +1076,27 @@ impl WebSocketTabState
             });
 
         });
+
+        let weak_self = this.adapted_contents_box.weak_parent();
+
+        this.ping_zero_button.connect_clicked(move |_btn|
+        {
+
+            up_rc(&weak_self, |this|
+            {
+    
+                if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::SendPingZero)
+                {
+
+                    panic!("{}", err)
+
+                }
+
+
+            });
+
+        });
+
 
         //TimeOut
 
@@ -1198,7 +1243,7 @@ impl WebSocketTabState
 
                                 let is_active = connection_status.is_active();
 
-                                let has_messages = this.pipeline_message_count_decrementor.has_messages();
+                                let has_messages = this.write_frame_processor_actor_io_client.has_messages(); //pipeline_message_count_decrementor.has_messages();
 
                                 if is_active || has_messages
                                 {
@@ -1442,7 +1487,9 @@ impl WebSocketTabState
 
                     //self.connection_status_text
 
-                    self.send_ping_button.set_sensitive(false);
+                    self.ping_button.set_sensitive(false);
+
+                    self.ping_zero_button.set_sensitive(false);
 
                 }
                 ConnectionStatus::Connecting =>
@@ -1490,7 +1537,9 @@ impl WebSocketTabState
 
                     self.disconnect_button.set_sensitive(true);
 
-                    self.send_ping_button.set_sensitive(true);
+                    self.ping_button.set_sensitive(true);
+
+                    self.ping_zero_button.set_sensitive(true);
 
                 }
                 ConnectionStatus::Disconnecting =>
@@ -1502,7 +1551,9 @@ impl WebSocketTabState
 
                     self.disconnect_button.set_sensitive(false);
 
-                    self.send_ping_button.set_sensitive(false);
+                    self.ping_button.set_sensitive(false);
+
+                    self.ping_zero_button.set_sensitive(false);
 
                 }
 

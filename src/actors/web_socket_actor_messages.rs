@@ -43,7 +43,8 @@ pub enum WebSocketActorInputMessage
     ConnectTo(String), //, Sender<()>) //URL, Has the WebSockect actor started trying to connect to the server?
     Disconnect,
     WriteFrame(OwnedFrame),
-    SendPing
+    SendPing(String),
+    SendPingZero
 
 }
 
@@ -148,12 +149,15 @@ pub enum WriteFrameProcessorActorOutputMessage
 
 //WriteFrameProcessorActor output
 
+//The frame has been read...
+
 #[derive(Debug)]
 pub enum ReadFrameProcessorActorInputMessage
 {
 
     ClientMessage(WebSocketActorOutputClientMessage),
-    Frame(OwnedFrame) //Frame)
+    Frame(OwnedFrame),
+    FrameAndMessage(OwnedFrame, WebSocketActorOutputClientMessage)
 
 }
 
