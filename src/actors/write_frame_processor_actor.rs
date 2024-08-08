@@ -217,6 +217,9 @@ impl WriteFrameProcessorActorState
 
                             //Set the payload of the OwnedFrame the right size.
         
+                            of.set_payload_from_str(&contents);
+
+                            /* 
                             let content_bytes = contents.as_bytes();
         
                             let payload = &mut of.payload;
@@ -233,6 +236,7 @@ impl WriteFrameProcessorActorState
                             //Copy the bytes into the OwnedFrame payload. 
         
                             payload.copy_from_slice(content_bytes);
+                            */
 
                         }
 
@@ -245,6 +249,25 @@ impl WriteFrameProcessorActorState
 
                     }
 
+                }
+                WriteFrameProcessorActorInputMessage::SendPing(contents) =>
+                {
+
+                    //Cache...
+
+                    let mut of = OwnedFrame::new();
+
+                    of.ping_setup();
+
+                    of.set_payload_from_str(&contents);
+
+                    if let Err(_) = self.web_socket_input_sender.send(WebSocketActorInputMessage::WriteFrame(of)).await
+                    {
+
+                        return false;
+
+                    }
+                    
                 }
 
             }

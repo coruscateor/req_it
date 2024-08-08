@@ -166,12 +166,12 @@ impl ReadFrameProcessorActorState
 
         }
 
-        let payload_output;
+        let opt_payload_output;
 
         if frame.payload.is_empty()
         {
 
-            payload_output = None;
+            opt_payload_output = None;
 
         }
         else
@@ -187,7 +187,7 @@ impl ReadFrameProcessorActorState
                     
                     let payload_as_utf8 = String::from_utf8_lossy(&frame.payload);
     
-                    payload_output = Some(PayloadOutput::Text(payload_as_utf8));
+                    opt_payload_output = Some(PayloadOutput::Text(payload_as_utf8));
     
                 }
                 OpCode::Binary =>
@@ -195,13 +195,13 @@ impl ReadFrameProcessorActorState
     
                     //Format as a particular type (JSON)?
                     
-                    payload_output = Some(PayloadOutput::Binary(&frame.payload));
+                    opt_payload_output = Some(PayloadOutput::Binary(&frame.payload));
     
                 }
                 OpCode::Continuation =>
                 {
     
-                    payload_output = Some(PayloadOutput::Binary(&frame.payload));
+                    opt_payload_output = Some(PayloadOutput::Binary(&frame.payload));
     
                 }
                 OpCode::Close | OpCode::Ping | OpCode::Pong =>
@@ -211,7 +211,7 @@ impl ReadFrameProcessorActorState
 
                     let payload_as_utf8 = String::from_utf8_lossy(&frame.payload);
     
-                    payload_output = Some(PayloadOutput::Text(payload_as_utf8));
+                    opt_payload_output = Some(PayloadOutput::Text(payload_as_utf8));
 
                 }
                 /*
@@ -223,7 +223,42 @@ impl ReadFrameProcessorActorState
             
         }
 
-        format!("{{fin: {fin},\nopcode: {opcode:?},\npayload {payload:?}}}", fin = frame.fin, opcode = frame.opcode, payload = payload_output)
+        match opt_payload_output
+        {
+            Some(payload_output) =>
+            {
+
+                match payload_output
+                {
+
+                    PayloadOutput::Text(text) =>
+                    {
+
+                        format!("{{\n\tfin: {fin},\n\topcode: {opcode:?},\n\tpayload: \"{text}\"\n}}", fin = frame.fin, opcode = frame.opcode)
+
+                    }
+                    PayloadOutput::Binary(binary) =>
+                    {
+
+                        format!("{{\n\tfin: {fin},\n\topcode: {opcode:?},\n\tpayload: {binary:?}\n}}", fin = frame.fin, opcode = frame.opcode)
+
+                    }
+
+                }
+
+            }
+            None =>
+            {
+
+                format!("{{\n\tfin: {fin},\n\topcode: {opcode:?}\n}}", fin = frame.fin, opcode = frame.opcode)
+
+                //format!("{{\n\tfin: {fin},\n\topcode: {opcode:?},\n\tpayload: None\n}}", fin = frame.fin, opcode = frame.opcode)
+
+            }
+
+        }
+
+        //format!("{{fin: {fin},\nopcode: {opcode:?},\npayload {payload:?}}}", fin = frame.fin, opcode = frame.opcode, payload = payload_output)
 
     }
 

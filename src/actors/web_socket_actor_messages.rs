@@ -43,8 +43,8 @@ pub enum WebSocketActorInputMessage
     ConnectTo(String), //, Sender<()>) //URL, Has the WebSockect actor started trying to connect to the server?
     Disconnect,
     WriteFrame(OwnedFrame),
-    SendPing(String),
-    SendPingZero
+    //SendPing(SendableText),
+    //SendPingZero
 
 }
 
@@ -134,7 +134,8 @@ pub enum WriteFrameProcessorActorInputMessage
 
     Process(String, ProcessingFormat),
     //PassThroughToWebSocketActor()
-
+    SendPing(SendableText)
+    
 }
 
 /*

@@ -216,4 +216,28 @@ impl OwnedFrame
 
     }
 
+    pub fn set_payload_from_str(&mut self, contents: &str)
+    {
+        
+        //Set the payload of the OwnedFrame the right size.
+
+        let content_bytes = contents.as_bytes();
+
+        let payload = &mut self.payload;
+        
+        let cb_len = content_bytes.len();
+
+        if cb_len != payload.len()
+        {
+
+            payload.resize(cb_len, 0);
+
+        }
+
+        //Copy the bytes into the OwnedFrame payload. 
+
+        payload.copy_from_slice(content_bytes);
+
+    }
+
 }

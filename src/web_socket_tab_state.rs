@@ -28,7 +28,9 @@ use gtk_estate::adw::prelude::{Cast, ObjectExt};
 
 //use gtk_estate::gtk4::traits::ListBoxRowExt;
 
-use gtk_estate::gtk4::{Align, BoxLayout, ListBox, ListBoxRow, StringObject, Widget};
+//use gtk_estate::gtk4::traits::OrientableExt;
+
+use gtk_estate::gtk4::{Align, BoxLayout, ListBox, ListBoxRow, Separator, StringObject, Widget};
 
 use gtk_estate::gtk4::{builders::ButtonBuilder, prelude::EditableExt};
 
@@ -93,6 +95,8 @@ use gtk_estate::gtk4::gio::ListModel;
 
 use gtk_estate::gtk4::prelude::ListBoxRowExt;
 
+use gtk_estate::gtk4::prelude::OrientableExt;
+
 //type OneshotTryRecvError = tokio::sync::oneshot::error::TryRecvError;
 
 //static FORMAT_DROPDOWN_STRS: [&str] = ["JSON To CBOR", "Text"];
@@ -123,6 +127,8 @@ fn format_dropdown_strs() -> &'static [&'static str]
 static TEXT: &str = "Text";
 
 static FORMAT_DROPDOWN_STRS: &[&str] = &[TEXT];
+
+static PING_TYPE_STRS: &[&str] = &["\"0\"", "\"\""];
 
 #[derive(Debug, Default, Eq, PartialEq, Copy, Clone)]
 enum ConnectionStatus
@@ -328,7 +334,8 @@ pub struct WebSocketTabState
 
     web_socket_actor_poller: RcSimpleTimeOut<Weak<WebSocketTabState>>,
     ping_button: Button,
-    ping_zero_button: Button,
+    //ping_zero_button: Button,
+    ping_type_dropdown: DropDown,
     connected_address_text: Text,
     connection_status_text: Text,
     mut_state: RefCell<MutState>,
@@ -406,13 +413,7 @@ impl WebSocketTabState
 
         //tool_left_box.set_hexpand_set(true);
 
-        //Format DropDown 
-
-        let format_dropdown = DropDown::from_strings(FORMAT_DROPDOWN_STRS);
-
-        tool_left_box.append(&format_dropdown);
-
-        //ping
+        //Ping
 
         let ping_button = Button::builder().label("Ping").build();
 
@@ -426,21 +427,41 @@ impl WebSocketTabState
 
         tool_left_box.append(&ping_button);
 
+        //Ping Type
+
+        let ping_type_dropdown = DropDown::from_strings(PING_TYPE_STRS);
+
+        tool_left_box.append(&ping_type_dropdown);
+
+        //
+
+        append_separator(&tool_left_box);
+
+        //
+
+        //append_separator(&tool_left_box);
+
         //ping_zero
 
-        let ping_zero_button = Button::builder().label("Ping \"0\"").build();
+        //let ping_zero_button = Button::builder().label("Ping \"0\"").build();
 
         //Send Button
 
         let send_button = Button::builder().label("Send").build();
 
-        send_button.set_halign(Align::Center);
+        //send_button.set_halign(Align::Center);
 
-        send_button.set_hexpand(true);
+        //send_button.set_hexpand(true);
 
         send_button.set_sensitive(false);
 
         tool_left_box.append(&send_button);
+        
+        //Format DropDown 
+
+        let format_dropdown = DropDown::from_strings(FORMAT_DROPDOWN_STRS);
+
+        tool_left_box.append(&format_dropdown);
 
         //
 
@@ -464,7 +485,7 @@ impl WebSocketTabState
 
         //Right
 
-        let tool_right_box = Box::new(Orientation::Horizontal, 0); //2);
+        let tool_right_box = Box::new(Orientation::Horizontal, 5); //2);
 
         //tool_right_box.set_margin_start(10);
 
@@ -484,7 +505,7 @@ impl WebSocketTabState
 
         let connected_address_text = Text::new();
 
-        connected_address_text.set_sensitive(false);
+        connected_address_text.set_editable(false); //.set_sensitive(false);
 
         //connected_address_text.set_hexpand(true);
 
@@ -494,11 +515,15 @@ impl WebSocketTabState
 
         tool_right_box.append(&connected_address_text);
 
+        //
+
+        append_separator(&tool_right_box);
+
         //The current connection status
 
         let connection_status_text = Text::new();
 
-        connection_status_text.set_sensitive(false);
+        connection_status_text.set_editable(false); //.set_sensitive(false);
 
         //connection_status_text.set_hexpand(true);
 
@@ -824,7 +849,8 @@ impl WebSocketTabState
                 tokio_rt_handle: wcs.tokio_rt_handle().clone(),
                 web_socket_actor_poller: SimpleTimeOut::with_state_ref(Duration::new(1, 0), weak_self), //new(Duration::new(1, 0)),
                 ping_button,
-                ping_zero_button,
+                ping_type_dropdown,
+                //ping_zero_button,
                 connected_address_text,
                 connection_status_text,
                 mut_state: RefCell::new(MutState::new()),
@@ -1038,9 +1064,7 @@ impl WebSocketTabState
                                 })
 
                             }
-                            _ =>
-                            {
-                            }
+                            _ => todo!()
 
                         }
 
@@ -1063,20 +1087,66 @@ impl WebSocketTabState
             up_rc(&weak_self, |this|
             {
 
+                //What payload should the ping message have? 
+
+                if let Some(item) = this.ping_type_dropdown.selected_item()
+                {
+
+                    if let Some(so_item) = item.downcast_ref::<StringObject>()
+                    {
+
+                        match so_item.string().as_str()
+                        {
+
+                            "\"0\"" =>
+                            {
+
+                                if let Err(err) = this.write_frame_processor_actor_io_client.sender().try_send(WriteFrameProcessorActorInputMessage::SendPing(SendableText::Str("0")))
+                                {
+                
+                                    panic!("{}", err)
+                
+                                }
+
+                            }
+                            "\"\"" =>
+                            {
+
+                                if let Err(err) = this.write_frame_processor_actor_io_client.sender().try_send(WriteFrameProcessorActorInputMessage::SendPing(SendableText::Str("")))
+                                {
+                
+                                    panic!("{}", err)
+                
+                                }
+
+                            }
+                            _ => todo!()
+                            
+                        }
+
+
+                    }
+
+                }
+
+                //For wnen the "Text To Be Sent" option is implemented.
+
+                /*
                 let tv_string = get_text_view_string(&this.to_be_sent_text);
     
-                if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::SendPing(tv_string))
+                if let Err(err) = this.write_frame_processor_actor_io_client.web_socket_input_sender().try_send(WebSocketActorInputMessage::SendPing(SendableText::String(tv_string)))
                 {
 
                     panic!("{}", err)
 
                 }
-
+                */
 
             });
 
         });
 
+        /*
         let weak_self = this.adapted_contents_box.weak_parent();
 
         this.ping_zero_button.connect_clicked(move |_btn|
@@ -1096,7 +1166,7 @@ impl WebSocketTabState
             });
 
         });
-
+        */
 
         //TimeOut
 
@@ -1489,7 +1559,7 @@ impl WebSocketTabState
 
                     self.ping_button.set_sensitive(false);
 
-                    self.ping_zero_button.set_sensitive(false);
+                    //self.ping_zero_button.set_sensitive(false);
 
                 }
                 ConnectionStatus::Connecting =>
@@ -1503,7 +1573,7 @@ impl WebSocketTabState
 
                     //self.connect_button.set_sensitive(false);
 
-                    self.connected_address_text.buffer().set_text(self.connected_address_text.buffer().text());
+                    self.connected_address_text.buffer().set_text(self.address_text.buffer().text());
 
                     //
 
@@ -1539,7 +1609,7 @@ impl WebSocketTabState
 
                     self.ping_button.set_sensitive(true);
 
-                    self.ping_zero_button.set_sensitive(true);
+                    //self.ping_zero_button.set_sensitive(true);
 
                 }
                 ConnectionStatus::Disconnecting =>
@@ -1553,7 +1623,7 @@ impl WebSocketTabState
 
                     self.ping_button.set_sensitive(false);
 
-                    self.ping_zero_button.set_sensitive(false);
+                    //self.ping_zero_button.set_sensitive(false);
 
                 }
 
@@ -1580,5 +1650,29 @@ impl WidgetStateContainer for WebSocketTabState
         self.adapted_contents_box.clone()
 
     }
+
+}
+
+fn append_separator(the_box: &Box) //widget: impl WidgetExt)
+{
+
+    the_box.append(&Separator::new(the_box.orientation()));
+
+    /* 
+    match the_box.orientation()
+    {
+
+        Orientation::Horizontal =>
+        {
+
+            
+
+        }
+        Orientation::Vertical => todo!(),
+        _ => todo!(),
+    }
+    */
+
+    //widget.append
 
 }
