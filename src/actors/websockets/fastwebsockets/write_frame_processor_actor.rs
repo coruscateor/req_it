@@ -21,7 +21,7 @@ use super::{ProcessingFormat, ReadFrameProcessorActorInputMessage, ReadFrameProc
 
 use super::OwnedFrame;
 
-use crate::actors::pipeline_message_counter::Incrementor;
+use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Incrementor;
 
 use delegate::delegate;
 

@@ -59,7 +59,7 @@ use widget_ext::{set_margin_sides_and_bottom, set_margin_start_and_end, set_marg
 
 //use super::pipeline_message_counter::*;
 
-use crate::actors::pipeline_message_counter::*;
+use crate::actors::websockets::fastwebsockets::pipeline_message_counter::*;
 
 //https://gtk-rs.org/gtk4-rs/stable/latest/docs/gtk4/struct.Paned.html
 
@@ -73,7 +73,7 @@ use crate::actors::pipeline_message_counter::*;
 
 //https://web.archive.org/web/20221126181112/https://world.pages.gitlab.gnome.org/Rust/libadwaita-rs/stable/latest/docs/libadwaita/index.html
 
-use crate::actors::{ProcessingFormat, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActor, WriteFrameProcessorActorIOClient, WriteFrameProcessorActorInputMessage, WriteFrameProcessorActorState};
+use crate::actors::websockets::fastwebsockets::{ProcessingFormat, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActor, WriteFrameProcessorActorIOClient, WriteFrameProcessorActorInputMessage, WriteFrameProcessorActorState};
 
 use crate::window_contents_state::WindowContentsState;
 
@@ -89,7 +89,7 @@ use gtk::glib::clone;
 
 use tokio::sync::mpsc::error::TryRecvError;
 
-use crate::actors::{ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage};
+use crate::actors::websockets::fastwebsockets::{ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage};
 
 use gtk_estate::gtk4::gio::ListModel;
 

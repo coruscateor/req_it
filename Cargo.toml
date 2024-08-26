@@ -15,10 +15,10 @@ categories = ["web-programming::http-client"]
 [dependencies]
 #gtk_estate = { path="../gtk_estate", features = ["adw"] } #Do not remove
 gtk_estate = { version = "0.3.0", features = ["adw", "gtk_v4_14"] }
-reqwest = { version = "0.11.*", features = [ "json" ] }
+#reqwest = { version = "0.11.*", features = [ "json" ] }
 act_rs = { path="../act_rs", features = ["tokio"] } #Do not remove
 #act_rs = "0.1.0"
-tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "sync", "macros"] }
+tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "sync", "macros", "time"] }
 #async-trait = "0.1.*"
 paste = "1.0.*"
 #corlib_local = { path="../corlib" }
@@ -27,7 +27,7 @@ corlib = { path="../corlib" }
 pretty_goodness = "0.1.0"
 serde_json = "1.0.95"
 
-fastwebsockets = { version = "0.8.*", features = ["upgrade"] }
+fastwebsockets = { version = "0.8.*", features = ["upgrade", "unstable-split"] }
 
 hyper = "1.*"
 
@@ -42,5 +42,7 @@ bytes = "1.6.0"
 delegate = "0.*"
 
 url = "2.5.*"
+
+libsync = { path="../libsync" } #, features = ["std", "crossbeam", "tokio"]}
 
 
