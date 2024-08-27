@@ -28,3 +28,13 @@ fn main()
     app.run();
 
 }
+
+/*
+
+error[E0599]: no method named `forget_permits` found for struct `Semaphore` in the current scope
+  --> /run/media/paul/Main Stuff/SoftwareProjects/Rust/libsync/src/tokio_helpers/semaphore_controller.rs:84:17
+   |
+84 |        self.sem.forget_permits(1)
+   |                 ^^^^^^^^^^^^^^ method not found in `Semaphore`
+
+ */

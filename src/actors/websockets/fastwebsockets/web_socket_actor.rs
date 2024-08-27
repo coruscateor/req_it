@@ -18,11 +18,11 @@ use hyper::body::Incoming;
 
 use hyper::Response;
 
-use tokio::io::{self, AsyncWriteExt};
+use tokio::io::{self, AsyncWriteExt, ReadHalf, WriteHalf};
 
 use tokio::select;
 
-use tokio::sync::mpsc::{channel, Sender};
+//use tokio::sync::mpsc::{channel, Sender};
 
 use tokio::{sync::mpsc::Receiver, runtime::Handle};
 use url::Url;
@@ -68,6 +68,8 @@ use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Increme
 //use super::WebSocketActorStateBuilder;
 
 use tokio::time::timeout_at;
+
+use libsync::crossbeam::mpmc::tokio::array_queue::{Sender, Receiver, channel};
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
@@ -168,9 +170,15 @@ impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
 
 }
 
+type WebSocketReadHalf = WebSocketRead<ReadHalf<TokioIo<Upgraded>>>;
+
+type WebSocketWriteHalf = WebSocketWrite<WriteHalf<TokioIo<Upgraded>>>;
+
 //WriteFrameProcessorActor -> WebSocketActor -> ReadFrameProcessorActor
 
 //WebSocketActors input queue/channel can be accessed via WriteFrameProcessorActors inter-actor directly, allowing it to be bypassed.
+
+//Writing WebSocket Actor
 
 pub struct WebSocketActorState
 {
@@ -356,11 +364,13 @@ impl WebSocketActorState
 
         let (ws, res) = handshake::client(&SpawnExecutor, request, connection_stream).await?;
 
+        /*
         let res = ws.split(|connection| {
 
             connection.inner().
 
         });
+        */
 
         //println!("{res:?}");
 
@@ -685,6 +695,20 @@ impl WebSocketActorState
 
             Ok(res) => 
             {
+
+                //Split the stream here
+
+                let (read, write) = res.0.split(tokio::io::split);
+
+                /*
+                let tokio_upgraded = res.0.into_inner();
+
+                let upgraded = tokio_upgraded.into_inner();
+
+                //let stream: TcpStream = upgraded.into();
+
+                let dc = upgraded.downcast::<TcpStream>();
+                */
 
                 let connection = CurrentConnection::FragmentCollector(FragmentCollector::new(res.0));
 
@@ -1227,6 +1251,17 @@ impl WebSocketActorState
 
 impl_mac_task_actor!(WebSocketActor);
 
+
+struct ReadWebSocketActorState
+{
+
+
+
+}
+
+
+
+/*
 //Shutdown the current connection.
 
 async fn shutdown(web_socket_reader: WebSocketRead)
@@ -1235,3 +1270,4 @@ async fn shutdown(web_socket_reader: WebSocketRead)
     current_connection.shutdown().await.unwrap();
 
 }
+*/

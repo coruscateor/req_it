@@ -18,7 +18,10 @@ gtk_estate = { version = "0.3.0", features = ["adw", "gtk_v4_14"] }
 #reqwest = { version = "0.11.*", features = [ "json" ] }
 act_rs = { path="../act_rs", features = ["tokio"] } #Do not remove
 #act_rs = "0.1.0"
-tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "sync", "macros", "time"] }
+
+libsync = { path="../libsync", features = ["std", "crossbeam", "tokio"] } #, features = ["std", "crossbeam", "tokio"]}
+
+tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "sync", "macros", "time", "io-util"] }
 #async-trait = "0.1.*"
 paste = "1.0.*"
 #corlib_local = { path="../corlib" }
@@ -35,6 +38,8 @@ http-body-util = "0.1.*"
 
 anyhow = "1.0.*"
 
+#libsync = { path="../libsync", features = ["std", "crossbeam", "tokio"] } #, features = ["std", "crossbeam", "tokio"]}
+
 hyper-util = { version = "0.1.*", features = ["tokio"] }
 
 bytes = "1.6.0"
@@ -43,6 +48,5 @@ delegate = "0.*"
 
 url = "2.5.*"
 
-libsync = { path="../libsync" } #, features = ["std", "crossbeam", "tokio"]}
-
+#libsync = { path="../libsync", features = ["std", "crossbeam", "tokio"] } #, features = ["std", "crossbeam", "tokio"]}
 
