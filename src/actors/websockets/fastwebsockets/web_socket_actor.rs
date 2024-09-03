@@ -4,7 +4,7 @@ use act_rs::{impl_default_end_async, impl_default_start_and_end_async, impl_defa
 
 use act_rs::tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io};
 
-use fastwebsockets::{handshake, FragmentCollector, Frame, OpCode, WebSocket, WebSocketError, WebSocketRead, WebSocketWrite};
+use fastwebsockets::{handshake, FragmentCollector, FragmentCollectorRead, Frame, OpCode, WebSocket, WebSocketError, WebSocketRead, WebSocketWrite};
 
 //use gtk_estate::corlib::MovableText;
 
@@ -24,7 +24,8 @@ use tokio::select;
 
 //use tokio::sync::mpsc::{channel, Sender};
 
-use tokio::{sync::mpsc::Receiver, runtime::Handle};
+//use tokio::{sync::mpsc::Receiver, runtime::Handle};
+
 use url::Url;
 
 use std::cell::RefCell;
@@ -57,6 +58,7 @@ use tokio::task::JoinHandle;
 
 use crate::actors::websockets::fastwebsockets::{OwnedFrame, ReadFrameProcessorActorInputMessage}; //, WebSocketActorOutputServerMessage};
 
+use super::websocket_read_and_write::{WebSocketReadHalf, WebSocketWriteHalf};
 use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage}; //, WebSocketConnectionState}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
 use paste::paste;
@@ -70,6 +72,8 @@ use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Increme
 use tokio::time::timeout_at;
 
 use libsync::crossbeam::mpmc::tokio::array_queue::{Sender, Receiver, channel};
+
+use crate::actors::websockets::fastwebsockets::websocket_read_and_write::WebSocketReader;
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
@@ -142,11 +146,14 @@ enum ContinueOrConnected
 
 }
 
+///
+/// CLER: ConnectedLoopExitReason
+/// 
 enum CLEROrConnected
 {
 
     CLER(Option<ConnectedLoopExitReason>),
-    Connected(WebSocketWrite<TokioIo<Upgraded>>)
+    Connected(WebSocketWriteHalf)
 
 }
 
@@ -169,10 +176,6 @@ impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
     }
 
 }
-
-type WebSocketReadHalf = WebSocketRead<ReadHalf<TokioIo<Upgraded>>>;
-
-type WebSocketWriteHalf = WebSocketWrite<WriteHalf<TokioIo<Upgraded>>>;
 
 //WriteFrameProcessorActor -> WebSocketActor -> ReadFrameProcessorActor
 
@@ -234,7 +237,10 @@ impl WebSocketActorState
     async fn run_async(&mut self) -> bool
     {
 
-        if let Some(message) = self.input_receiver.recv().await
+        let recv_res = self.input_receiver.recv().await;
+
+        //if let Some(message) = self.input_receiver.recv().await
+        if let Ok(message) = recv_res
         {
 
             let res = self.process_received_actor_input_message(message).await;
@@ -381,7 +387,7 @@ impl WebSocketActorState
     ///
     /// Shuts down and drops the connection. The WebSocket connection closure process should've been comnpleted by this point.
     /// 
-    async fn disconnect_from_server(&mut self, mut web_socket_reader: WebSocketRead, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
+    async fn disconnect_from_server(&mut self, mut web_socket_reader: WebSocketReadHalf, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
     {
 
         /*
@@ -620,7 +626,7 @@ impl WebSocketActorState
 
     }
 
-    async fn force_disconnection_from_server(&mut self, web_socket_reader: WebSocketRead) -> Option<ConnectedLoopExitReason>
+    async fn force_disconnection_from_server(&mut self, web_socket_reader: WebSocketReadHalf) -> Option<ConnectedLoopExitReason>
     {
 
         current_connection.shutdown().await.unwrap();
@@ -710,7 +716,7 @@ impl WebSocketActorState
                 let dc = upgraded.downcast::<TcpStream>();
                 */
 
-                let connection = CurrentConnection::FragmentCollector(FragmentCollector::new(res.0));
+                let reader = WebSocketReader::FragmentCollectorRead(FragmentCollectorRead::new(read));
 
                 //Do something with the connection response,
 
@@ -729,7 +735,7 @@ impl WebSocketActorState
 
                 self.pipline_output_count_incrementor.inc();
 
-                return CLEROrConnected::Connected(connection);
+                return CLEROrConnected::Connected(write);
 
             },
             Err(err) =>
@@ -844,9 +850,10 @@ impl WebSocketActorState
 
     //The loop for when connected to a server, should the actor continue after this?
 
-    async fn connected_loop(&mut self, mut web_socket_reader: WebSocketRead) -> bool
+    async fn connected_loop(&mut self, mut web_socket_writer: WebSocketWriteHalf) -> bool
     {
 
+        /*
         enum InputOrReadFrame
         {
 
@@ -854,29 +861,106 @@ impl WebSocketActorState
             ReadFrame(Result<OwnedFrame, WebSocketError>)
 
         }
+        */
+
+        //Input only
 
         loop
         {
 
-            let connected_loop_next_move: InputOrReadFrame;
+            let res = self.input_receiver.recv().await; //=>
 
-            select! {
+            match res
+            {
 
-                res = self.input_receiver.recv() =>
+                Ok(message) =>
                 {
 
-                    connected_loop_next_move = InputOrReadFrame::Input(res);
+                    match message
+                    {
 
-                },
-                res = Self::read_frame(&mut current_connection, &self.pipline_output_count_incrementor) =>
+                        WebSocketActorInputMessage::ConnectTo(url) =>
+                        {
+
+                            if !Self::continue_or_not(&self.disconnect_from_server(web_socket_writer, false).await)
+                            {
+        
+                                return false;
+        
+                            }
+        
+                            let res = self.prepare_for_new_connection_and_connect(url).await;
+        
+                            match res
+                            {
+        
+                                CLEROrConnected::CLER(should_continue) =>
+                                {
+        
+                                    return Self::continue_or_not(&should_continue);
+        
+                                },
+                                CLEROrConnected::Connected(connection) =>
+                                {
+        
+                                    current_connection = connection;
+        
+                                    //The new connection is set, stay in the loop. 
+        
+                                }
+        
+                            }
+
+                        }
+                        WebSocketActorInputMessage::Disconnect =>
+                        {
+
+                            //User initiated disconnection
+
+                            return Self::continue_or_not(&self.disconnect_from_server(current_connection, false).await);
+
+                        }
+                        WebSocketActorInputMessage::WriteFrame(frame) =>
+                        {
+
+                            if let Err(err) = self.write_frame(&mut current_connection, frame).await
+                            {
+        
+                                return Self::continue_or_not(&self.on_web_socket_error(err, current_connection).await);
+        
+                            }
+
+                        }
+                        /*
+                        WebSocketActorInputMessage::SendPing(message) =>
+                        {
+
+
+
+                        }
+                        */
+
+                    }
+
+                }
+                Err(err) =>
                 {
 
-                    connected_loop_next_move = InputOrReadFrame::ReadFrame(res);
+
 
                 }
 
             }
 
+                /*
+                {
+
+                    connected_loop_next_move = res; //= InputOrReadFrame::Input(res);
+
+                }
+                */
+
+                /*
             match connected_loop_next_move
             {
 
@@ -1068,6 +1152,7 @@ impl WebSocketActorState
                 }
 
             }
+            */
 
         }
 
@@ -1075,6 +1160,7 @@ impl WebSocketActorState
 
     //Reads a frame from the proveded connection reference into an OwnedFrame.
 
+    /*
     async fn read_frame(current_connection: &mut CurrentConnection, pipline_output_count_incrementor: &Incrementor) -> Result<OwnedFrame, WebSocketError> //in_the_read_pipeline_count: &AtomicUsize) -> Result<OwnedFrame, WebSocketError>
     {
 
@@ -1093,6 +1179,7 @@ impl WebSocketActorState
         Ok(of)
 
     }
+    */
 
     async fn write_frame(&self, current_connection: &mut CurrentConnection, mut of: OwnedFrame) -> Result<(), WebSocketError>
     {
@@ -1114,7 +1201,7 @@ impl WebSocketActorState
 
     }
 
-    async fn on_web_socket_error(&mut self, error: WebSocketError, web_socket_reader: WebSocketRead) -> Option<ConnectedLoopExitReason> //, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
+    async fn on_web_socket_error(&mut self, error: WebSocketError, web_socket_reader: WebSocketReadHalf) -> Option<ConnectedLoopExitReason> //, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
     {
 
         let res = self.on_web_socket_error_report_only(error).await;

@@ -1,0 +1,853 @@
+[paul@fedora req_it]$ cargo tree
+req_it v0.1.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/req_it)
+├── act_rs v0.2.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs)
+│   ├── async-trait v0.1.64 (proc-macro)
+│   │   ├── proc-macro2 v1.0.79
+│   │   │   └── unicode-ident v1.0.6
+│   │   ├── quote v1.0.35
+│   │   │   └── proc-macro2 v1.0.79 (*)
+│   │   └── syn v1.0.107
+│   │       ├── proc-macro2 v1.0.79 (*)
+│   │       ├── quote v1.0.35 (*)
+│   │       └── unicode-ident v1.0.6
+│   ├── delegate v0.9.0 (proc-macro)
+│   │   ├── proc-macro2 v1.0.79 (*)
+│   │   ├── quote v1.0.35 (*)
+│   │   └── syn v1.0.107 (*)
+│   ├── futures v0.3.26
+│   │   ├── futures-channel v0.3.26
+│   │   │   ├── futures-core v0.3.26
+│   │   │   └── futures-sink v0.3.26
+│   │   ├── futures-core v0.3.26
+│   │   ├── futures-executor v0.3.26
+│   │   │   ├── futures-core v0.3.26
+│   │   │   ├── futures-task v0.3.26
+│   │   │   └── futures-util v0.3.26
+│   │   │       ├── futures-channel v0.3.26 (*)
+│   │   │       ├── futures-core v0.3.26
+│   │   │       ├── futures-io v0.3.26
+│   │   │       ├── futures-macro v0.3.26 (proc-macro)
+│   │   │       │   ├── proc-macro2 v1.0.79 (*)
+│   │   │       │   ├── quote v1.0.35 (*)
+│   │   │       │   └── syn v1.0.107 (*)
+│   │   │       ├── futures-sink v0.3.26
+│   │   │       ├── futures-task v0.3.26
+│   │   │       ├── memchr v2.7.1
+│   │   │       ├── pin-project-lite v0.2.9
+│   │   │       ├── pin-utils v0.1.0
+│   │   │       └── slab v0.4.7
+│   │   │           [build-dependencies]
+│   │   │           └── autocfg v1.1.0
+│   │   ├── futures-io v0.3.26
+│   │   ├── futures-sink v0.3.26
+│   │   ├── futures-task v0.3.26
+│   │   └── futures-util v0.3.26 (*)
+│   └── tokio v1.25.0
+│       ├── bytes v1.6.0
+│       ├── libc v0.2.155
+│       ├── memchr v2.7.1
+│       ├── mio v0.8.5
+│       │   ├── libc v0.2.155
+│       │   └── log v0.4.17
+│       │       └── cfg-if v1.0.0
+│       ├── num_cpus v1.15.0
+│       │   └── libc v0.2.155
+│       ├── pin-project-lite v0.2.9
+│       ├── socket2 v0.4.7
+│       │   └── libc v0.2.155
+│       └── tokio-macros v1.8.2 (proc-macro)
+│           ├── proc-macro2 v1.0.79 (*)
+│           ├── quote v1.0.35 (*)
+│           └── syn v1.0.107 (*)
+│       [build-dependencies]
+│       └── autocfg v1.1.0
+├── anyhow v1.0.68
+├── bytes v1.6.0
+├── corlib v0.3.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/corlib)
+│   └── delegate v0.9.0 (proc-macro) (*)
+├── delegate v0.9.0 (proc-macro) (*)
+├── fastwebsockets v0.8.0
+│   ├── base64 v0.21.0
+│   ├── bytes v1.6.0
+│   ├── http-body-util v0.1.2
+│   │   ├── bytes v1.6.0
+│   │   ├── futures-util v0.3.26 (*)
+│   │   ├── http v1.1.0
+│   │   │   ├── bytes v1.6.0
+│   │   │   ├── fnv v1.0.7
+│   │   │   └── itoa v1.0.5
+│   │   ├── http-body v1.0.0
+│   │   │   ├── bytes v1.6.0
+│   │   │   └── http v1.1.0 (*)
+│   │   └── pin-project-lite v0.2.9
+│   ├── hyper v1.3.1
+│   │   ├── bytes v1.6.0
+│   │   ├── futures-channel v0.3.26 (*)
+│   │   ├── futures-util v0.3.26 (*)
+│   │   ├── http v1.1.0 (*)
+│   │   ├── http-body v1.0.0 (*)
+│   │   ├── httparse v1.8.0
+│   │   ├── httpdate v1.0.2
+│   │   ├── itoa v1.0.5
+│   │   ├── pin-project-lite v0.2.9
+│   │   ├── smallvec v1.13.2
+│   │   ├── tokio v1.25.0 (*)
+│   │   └── want v0.3.0
+│   │       ├── log v0.4.17 (*)
+│   │       └── try-lock v0.2.4
+│   ├── hyper-util v0.1.5
+│   │   ├── bytes v1.6.0
+│   │   ├── futures-util v0.3.26 (*)
+│   │   ├── http v1.1.0 (*)
+│   │   ├── http-body v1.0.0 (*)
+│   │   ├── hyper v1.3.1 (*)
+│   │   ├── pin-project-lite v0.2.9
+│   │   └── tokio v1.25.0 (*)
+│   ├── pin-project v1.1.5
+│   │   └── pin-project-internal v1.1.5 (proc-macro)
+│   │       ├── proc-macro2 v1.0.79 (*)
+│   │       ├── quote v1.0.35 (*)
+│   │       └── syn v2.0.53
+│   │           ├── proc-macro2 v1.0.79 (*)
+│   │           ├── quote v1.0.35 (*)
+│   │           └── unicode-ident v1.0.6
+│   ├── rand v0.8.5
+│   │   ├── libc v0.2.155
+│   │   ├── rand_chacha v0.3.1
+│   │   │   ├── ppv-lite86 v0.2.17
+│   │   │   └── rand_core v0.6.4
+│   │   │       └── getrandom v0.2.15
+│   │   │           ├── cfg-if v1.0.0
+│   │   │           └── libc v0.2.155
+│   │   └── rand_core v0.6.4 (*)
+│   ├── sha1 v0.10.6
+│   │   ├── cfg-if v1.0.0
+│   │   ├── cpufeatures v0.2.12
+│   │   └── digest v0.10.7
+│   │       ├── block-buffer v0.10.4
+│   │       │   └── generic-array v0.14.7
+│   │       │       └── typenum v1.17.0
+│   │       │       [build-dependencies]
+│   │       │       └── version_check v0.9.4
+│   │       └── crypto-common v0.1.6
+│   │           ├── generic-array v0.14.7 (*)
+│   │           └── typenum v1.17.0
+│   ├── simdutf8 v0.1.4
+│   ├── thiserror v1.0.61
+│   │   └── thiserror-impl v1.0.61 (proc-macro)
+│   │       ├── proc-macro2 v1.0.79 (*)
+│   │       ├── quote v1.0.35 (*)
+│   │       └── syn v2.0.53 (*)
+│   ├── tokio v1.25.0 (*)
+│   └── utf-8 v0.7.6
+├── gtk_estate v0.3.0
+│   ├── cfg-if v1.0.0
+│   ├── corlib v0.3.0
+│   │   └── delegate v0.9.0 (proc-macro) (*)
+│   ├── delegate v0.9.0 (proc-macro) (*)
+│   ├── gtk4 v0.8.1
+│   │   ├── cairo-rs v0.19.2
+│   │   │   ├── bitflags v2.5.0
+│   │   │   ├── cairo-sys-rs v0.19.2
+│   │   │   │   ├── glib-sys v0.19.0
+│   │   │   │   │   └── libc v0.2.155
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── system-deps v6.0.3
+│   │   │   │   │       ├── cfg-expr v0.11.0
+│   │   │   │   │       │   └── smallvec v1.13.2
+│   │   │   │   │       ├── heck v0.4.0
+│   │   │   │   │       ├── pkg-config v0.3.30
+│   │   │   │   │       ├── toml v0.5.11
+│   │   │   │   │       │   └── serde v1.0.152
+│   │   │   │   │       └── version-compare v0.1.1
+│   │   │   │   └── libc v0.2.155
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── system-deps v6.0.3 (*)
+│   │   │   ├── glib v0.19.3
+│   │   │   │   ├── bitflags v2.5.0
+│   │   │   │   ├── futures-channel v0.3.26 (*)
+│   │   │   │   ├── futures-core v0.3.26
+│   │   │   │   ├── futures-executor v0.3.26 (*)
+│   │   │   │   ├── futures-task v0.3.26
+│   │   │   │   ├── futures-util v0.3.26 (*)
+│   │   │   │   ├── gio-sys v0.19.0
+│   │   │   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   │   │   ├── gobject-sys v0.19.0
+│   │   │   │   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   │   │   │   └── libc v0.2.155
+│   │   │   │   │   │   [build-dependencies]
+│   │   │   │   │   │   └── system-deps v6.0.3 (*)
+│   │   │   │   │   └── libc v0.2.155
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── system-deps v6.0.3 (*)
+│   │   │   │   ├── glib-macros v0.19.3 (proc-macro)
+│   │   │   │   │   ├── heck v0.5.0
+│   │   │   │   │   ├── proc-macro-crate v3.1.0
+│   │   │   │   │   │   └── toml_edit v0.21.1
+│   │   │   │   │   │       ├── indexmap v2.2.5
+│   │   │   │   │   │       │   ├── equivalent v1.0.1
+│   │   │   │   │   │       │   └── hashbrown v0.14.3
+│   │   │   │   │   │       ├── toml_datetime v0.6.5
+│   │   │   │   │   │       └── winnow v0.5.40
+│   │   │   │   │   ├── proc-macro2 v1.0.79 (*)
+│   │   │   │   │   ├── quote v1.0.35 (*)
+│   │   │   │   │   └── syn v2.0.53 (*)
+│   │   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   │   ├── gobject-sys v0.19.0 (*)
+│   │   │   │   ├── libc v0.2.155
+│   │   │   │   ├── memchr v2.7.1
+│   │   │   │   ├── smallvec v1.13.2
+│   │   │   │   └── thiserror v1.0.61 (*)
+│   │   │   ├── libc v0.2.155
+│   │   │   └── thiserror v1.0.61 (*)
+│   │   ├── field-offset v0.3.4
+│   │   │   └── memoffset v0.6.5
+│   │   │       [build-dependencies]
+│   │   │       └── autocfg v1.1.0
+│   │   │   [build-dependencies]
+│   │   │   └── rustc_version v0.3.3
+│   │   │       └── semver v0.11.0
+│   │   │           └── semver-parser v0.10.2
+│   │   │               └── pest v2.5.4
+│   │   │                   ├── thiserror v1.0.61 (*)
+│   │   │                   └── ucd-trie v0.1.5
+│   │   ├── futures-channel v0.3.26 (*)
+│   │   ├── gdk-pixbuf v0.19.2
+│   │   │   ├── gdk-pixbuf-sys v0.19.0
+│   │   │   │   ├── gio-sys v0.19.0 (*)
+│   │   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   │   ├── gobject-sys v0.19.0 (*)
+│   │   │   │   └── libc v0.2.155
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── system-deps v6.0.3 (*)
+│   │   │   ├── gio v0.19.3
+│   │   │   │   ├── futures-channel v0.3.26 (*)
+│   │   │   │   ├── futures-core v0.3.26
+│   │   │   │   ├── futures-io v0.3.26
+│   │   │   │   ├── futures-util v0.3.26 (*)
+│   │   │   │   ├── gio-sys v0.19.0 (*)
+│   │   │   │   ├── glib v0.19.3 (*)
+│   │   │   │   ├── libc v0.2.155
+│   │   │   │   ├── pin-project-lite v0.2.9
+│   │   │   │   ├── smallvec v1.13.2
+│   │   │   │   └── thiserror v1.0.61 (*)
+│   │   │   ├── glib v0.19.3 (*)
+│   │   │   └── libc v0.2.155
+│   │   ├── gdk4 v0.8.1
+│   │   │   ├── cairo-rs v0.19.2 (*)
+│   │   │   ├── gdk-pixbuf v0.19.2 (*)
+│   │   │   ├── gdk4-sys v0.8.1
+│   │   │   │   ├── cairo-sys-rs v0.19.2 (*)
+│   │   │   │   ├── gdk-pixbuf-sys v0.19.0 (*)
+│   │   │   │   ├── gio-sys v0.19.0 (*)
+│   │   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   │   ├── gobject-sys v0.19.0 (*)
+│   │   │   │   ├── libc v0.2.155
+│   │   │   │   └── pango-sys v0.19.0
+│   │   │   │       ├── glib-sys v0.19.0 (*)
+│   │   │   │       ├── gobject-sys v0.19.0 (*)
+│   │   │   │       └── libc v0.2.155
+│   │   │   │       [build-dependencies]
+│   │   │   │       └── system-deps v6.0.3 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   ├── pkg-config v0.3.30
+│   │   │   │   └── system-deps v6.0.3 (*)
+│   │   │   ├── gio v0.19.3 (*)
+│   │   │   ├── glib v0.19.3 (*)
+│   │   │   ├── libc v0.2.155
+│   │   │   └── pango v0.19.3
+│   │   │       ├── gio v0.19.3 (*)
+│   │   │       ├── glib v0.19.3 (*)
+│   │   │       ├── libc v0.2.155
+│   │   │       └── pango-sys v0.19.0 (*)
+│   │   ├── gio v0.19.3 (*)
+│   │   ├── glib v0.19.3 (*)
+│   │   ├── graphene-rs v0.19.2
+│   │   │   ├── glib v0.19.3 (*)
+│   │   │   ├── graphene-sys v0.19.0
+│   │   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   │   └── libc v0.2.155
+│   │   │   │   [build-dependencies]
+│   │   │   │   ├── pkg-config v0.3.30
+│   │   │   │   └── system-deps v6.0.3 (*)
+│   │   │   └── libc v0.2.155
+│   │   ├── gsk4 v0.8.1
+│   │   │   ├── cairo-rs v0.19.2 (*)
+│   │   │   ├── gdk4 v0.8.1 (*)
+│   │   │   ├── glib v0.19.3 (*)
+│   │   │   ├── graphene-rs v0.19.2 (*)
+│   │   │   ├── gsk4-sys v0.8.1
+│   │   │   │   ├── cairo-sys-rs v0.19.2 (*)
+│   │   │   │   ├── gdk4-sys v0.8.1 (*)
+│   │   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   │   ├── gobject-sys v0.19.0 (*)
+│   │   │   │   ├── graphene-sys v0.19.0 (*)
+│   │   │   │   ├── libc v0.2.155
+│   │   │   │   └── pango-sys v0.19.0 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── system-deps v6.0.3 (*)
+│   │   │   ├── libc v0.2.155
+│   │   │   └── pango v0.19.3 (*)
+│   │   ├── gtk4-macros v0.8.1 (proc-macro)
+│   │   │   ├── anyhow v1.0.68
+│   │   │   ├── proc-macro-crate v3.1.0 (*)
+│   │   │   ├── proc-macro-error v1.0.4
+│   │   │   │   ├── proc-macro-error-attr v1.0.4 (proc-macro)
+│   │   │   │   │   ├── proc-macro2 v1.0.79 (*)
+│   │   │   │   │   └── quote v1.0.35 (*)
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── version_check v0.9.4
+│   │   │   │   ├── proc-macro2 v1.0.79 (*)
+│   │   │   │   ├── quote v1.0.35 (*)
+│   │   │   │   └── syn v1.0.107 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── version_check v0.9.4
+│   │   │   ├── proc-macro2 v1.0.79 (*)
+│   │   │   ├── quote v1.0.35 (*)
+│   │   │   └── syn v1.0.107 (*)
+│   │   ├── gtk4-sys v0.8.1
+│   │   │   ├── cairo-sys-rs v0.19.2 (*)
+│   │   │   ├── gdk-pixbuf-sys v0.19.0 (*)
+│   │   │   ├── gdk4-sys v0.8.1 (*)
+│   │   │   ├── gio-sys v0.19.0 (*)
+│   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   ├── gobject-sys v0.19.0 (*)
+│   │   │   ├── graphene-sys v0.19.0 (*)
+│   │   │   ├── gsk4-sys v0.8.1 (*)
+│   │   │   ├── libc v0.2.155
+│   │   │   └── pango-sys v0.19.0 (*)
+│   │   │   [build-dependencies]
+│   │   │   └── system-deps v6.0.3 (*)
+│   │   ├── libc v0.2.155
+│   │   └── pango v0.19.3 (*)
+│   ├── libadwaita v0.6.0
+│   │   ├── gdk-pixbuf v0.19.2 (*)
+│   │   ├── gdk4 v0.8.1 (*)
+│   │   ├── gio v0.19.3 (*)
+│   │   ├── glib v0.19.3 (*)
+│   │   ├── gtk4 v0.8.1 (*)
+│   │   ├── libadwaita-sys v0.6.0
+│   │   │   ├── gdk4-sys v0.8.1 (*)
+│   │   │   ├── gio-sys v0.19.0 (*)
+│   │   │   ├── glib-sys v0.19.0 (*)
+│   │   │   ├── gobject-sys v0.19.0 (*)
+│   │   │   ├── gtk4-sys v0.8.1 (*)
+│   │   │   ├── libc v0.2.155
+│   │   │   └── pango-sys v0.19.0 (*)
+│   │   │   [build-dependencies]
+│   │   │   └── system-deps v6.0.3 (*)
+│   │   ├── libc v0.2.155
+│   │   └── pango v0.19.3 (*)
+│   └── paste v1.0.11 (proc-macro)
+├── http-body-util v0.1.2 (*)
+├── hyper v1.3.1 (*)
+├── hyper-util v0.1.5 (*)
+├── libsync v0.1.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/libsync)
+│   ├── crossbeam v0.8.4
+│   │   ├── crossbeam-channel v0.5.13
+│   │   │   └── crossbeam-utils v0.8.20
+│   │   ├── crossbeam-deque v0.8.5
+│   │   │   ├── crossbeam-epoch v0.9.18
+│   │   │   │   └── crossbeam-utils v0.8.20
+│   │   │   └── crossbeam-utils v0.8.20
+│   │   ├── crossbeam-epoch v0.9.18 (*)
+│   │   ├── crossbeam-queue v0.3.11
+│   │   │   └── crossbeam-utils v0.8.20
+│   │   └── crossbeam-utils v0.8.20
+│   ├── delegate v0.9.0 (proc-macro) (*)
+│   ├── futures v0.3.26 (*)
+│   └── tokio v1.25.0 (*)
+├── paste v1.0.11 (proc-macro)
+├── pretty_goodness v0.1.1
+│   ├── corlib v0.1.0
+│   │   ├── delegate v0.9.0 (proc-macro) (*)
+│   │   └── paste v1.0.11 (proc-macro)
+│   └── paste v1.0.11 (proc-macro)
+├── serde_json v1.0.95
+│   ├── itoa v1.0.5
+│   ├── ryu v1.0.12
+│   └── serde v1.0.152
+├── tokio v1.25.0 (*)
+└── url v2.5.2
+    ├── form_urlencoded v1.2.1
+    │   └── percent-encoding v2.3.1
+    ├── idna v0.5.0
+    │   ├── unicode-bidi v0.3.10
+    │   └── unicode-normalization v0.1.22
+    │       └── tinyvec v1.6.0
+    │           └── tinyvec_macros v0.1.0
+    └── percent-encoding v2.3.1
+[paul@fedora req_it]$ cargo update
+    Updating crates.io index
+     Locking 93 packages to latest compatible versions
+    Updating anyhow v1.0.68 -> v1.0.86
+    Updating async-trait v0.1.64 -> v0.1.82
+    Updating autocfg v1.1.0 -> v1.3.0
+    Updating base64 v0.21.0 -> v0.21.7 (latest: v0.22.1)
+    Updating bitflags v2.5.0 -> v2.6.0
+      Adding byteorder v1.5.0
+    Updating bytes v1.6.0 -> v1.7.1
+    Updating cairo-rs v0.19.2 -> v0.19.4 (latest: v0.20.1)
+    Updating cfg-expr v0.11.0 -> v0.15.8 (latest: v0.16.0)
+    Updating cpufeatures v0.2.12 -> v0.2.13
+    Updating delegate v0.9.0 -> v0.13.0
+    Updating field-offset v0.3.4 -> v0.3.6
+    Updating futures v0.3.26 -> v0.3.30
+    Updating futures-channel v0.3.26 -> v0.3.30
+    Updating futures-core v0.3.26 -> v0.3.30
+    Updating futures-executor v0.3.26 -> v0.3.30
+    Updating futures-io v0.3.26 -> v0.3.30
+    Updating futures-macro v0.3.26 -> v0.3.30
+    Updating futures-sink v0.3.26 -> v0.3.30
+    Updating futures-task v0.3.26 -> v0.3.30
+    Updating futures-util v0.3.26 -> v0.3.30
+    Updating gdk-pixbuf v0.19.2 -> v0.19.8 (latest: v0.20.1)
+    Updating gdk-pixbuf-sys v0.19.0 -> v0.19.8 (latest: v0.20.1)
+    Updating gdk4 v0.8.1 -> v0.8.2 (latest: v0.9.0)
+    Updating gdk4-sys v0.8.1 -> v0.8.2 (latest: v0.9.0)
+    Updating gio v0.19.3 -> v0.19.8 (latest: v0.20.1)
+    Updating gio-sys v0.19.0 -> v0.19.8 (latest: v0.20.1)
+    Updating glib v0.19.3 -> v0.19.9 (latest: v0.20.2)
+    Updating glib-macros v0.19.3 -> v0.19.9 (latest: v0.20.2)
+    Updating glib-sys v0.19.0 -> v0.19.8 (latest: v0.20.2)
+    Updating gobject-sys v0.19.0 -> v0.19.8 (latest: v0.20.1)
+    Updating graphene-rs v0.19.2 -> v0.19.8 (latest: v0.20.1)
+    Updating graphene-sys v0.19.0 -> v0.19.8 (latest: v0.20.1)
+    Updating gsk4 v0.8.1 -> v0.8.2 (latest: v0.9.0)
+    Updating gsk4-sys v0.8.1 -> v0.8.2 (latest: v0.9.0)
+    Updating gtk4 v0.8.1 -> v0.8.2 (latest: v0.9.1)
+    Updating gtk4-macros v0.8.1 -> v0.8.2 (latest: v0.9.1)
+    Updating gtk4-sys v0.8.1 -> v0.8.2 (latest: v0.9.0)
+    Updating hashbrown v0.14.3 -> v0.14.5
+    Removing heck v0.4.0
+    Updating http-body v1.0.0 -> v1.0.1
+    Updating httparse v1.8.0 -> v1.9.4
+    Updating httpdate v1.0.2 -> v1.0.3
+    Updating hyper v1.3.1 -> v1.4.1
+    Updating hyper-util v0.1.5 -> v0.1.7
+    Updating indexmap v2.2.5 -> v2.5.0
+    Updating itoa v1.0.5 -> v1.0.11
+    Updating libc v0.2.155 -> v0.2.158
+    Removing log v0.4.17
+    Updating memchr v2.7.1 -> v2.7.4
+    Updating memoffset v0.6.5 -> v0.9.1
+    Updating pango v0.19.3 -> v0.19.8 (latest: v0.20.1)
+    Updating pango-sys v0.19.0 -> v0.19.8 (latest: v0.20.1)
+    Updating paste v1.0.11 -> v1.0.15
+    Removing pest v2.5.4
+    Updating ppv-lite86 v0.2.17 -> v0.2.20
+    Updating proc-macro-crate v3.1.0 -> v3.2.0
+    Removing proc-macro-error v1.0.4
+    Removing proc-macro-error-attr v1.0.4
+    Updating proc-macro2 v1.0.79 -> v1.0.86
+    Updating quote v1.0.35 -> v1.0.37
+    Updating rustc_version v0.3.3 -> v0.4.1
+    Updating ryu v1.0.12 -> v1.0.18
+    Updating semver v0.11.0 -> v1.0.23
+    Removing semver-parser v0.10.2
+    Updating serde v1.0.152 -> v1.0.209
+      Adding serde_derive v1.0.209
+    Updating serde_json v1.0.95 -> v1.0.127
+      Adding serde_spanned v0.6.7
+    Updating slab v0.4.7 -> v0.4.9
+    Removing syn v1.0.107
+    Removing syn v2.0.53
+      Adding syn v2.0.77
+    Updating system-deps v6.0.3 -> v6.2.2 (latest: v7.0.2)
+      Adding target-lexicon v0.12.16
+    Updating thiserror v1.0.61 -> v1.0.63
+    Updating thiserror-impl v1.0.61 -> v1.0.63
+    Updating tinyvec v1.6.0 -> v1.8.0
+    Updating tinyvec_macros v0.1.0 -> v0.1.1
+    Updating toml v0.5.11 -> v0.8.19
+    Updating toml_datetime v0.6.5 -> v0.6.8
+    Updating toml_edit v0.21.1 -> v0.22.20
+    Updating try-lock v0.2.4 -> v0.2.5
+    Removing ucd-trie v0.1.5
+    Updating unicode-bidi v0.3.10 -> v0.3.15
+    Updating unicode-ident v1.0.6 -> v1.0.12
+    Updating unicode-normalization v0.1.22 -> v0.1.23
+    Updating version-compare v0.1.1 -> v0.2.0
+    Updating version_check v0.9.4 -> v0.9.5
+    Updating want v0.3.0 -> v0.3.1
+    Updating windows-targets v0.52.4 -> v0.52.6
+    Updating windows_aarch64_gnullvm v0.52.4 -> v0.52.6
+    Updating windows_aarch64_msvc v0.52.4 -> v0.52.6
+    Updating windows_i686_gnu v0.52.4 -> v0.52.6
+      Adding windows_i686_gnullvm v0.52.6
+    Updating windows_i686_msvc v0.52.4 -> v0.52.6
+    Updating windows_x86_64_gnu v0.52.4 -> v0.52.6
+    Updating windows_x86_64_gnullvm v0.52.4 -> v0.52.6
+    Updating windows_x86_64_msvc v0.52.4 -> v0.52.6
+    Updating winnow v0.5.40 -> v0.6.18
+      Adding zerocopy v0.7.35
+      Adding zerocopy-derive v0.7.35
+note: pass `--verbose` to see 12 unchanged dependencies behind latest
+[paul@fedora req_it]$ cargo tree
+req_it v0.1.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/req_it)
+├── act_rs v0.2.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/act_rs)
+│   ├── async-trait v0.1.82 (proc-macro)
+│   │   ├── proc-macro2 v1.0.86
+│   │   │   └── unicode-ident v1.0.12
+│   │   ├── quote v1.0.37
+│   │   │   └── proc-macro2 v1.0.86 (*)
+│   │   └── syn v2.0.77
+│   │       ├── proc-macro2 v1.0.86 (*)
+│   │       ├── quote v1.0.37 (*)
+│   │       └── unicode-ident v1.0.12
+│   ├── delegate v0.13.0 (proc-macro)
+│   │   ├── proc-macro2 v1.0.86 (*)
+│   │   ├── quote v1.0.37 (*)
+│   │   └── syn v2.0.77 (*)
+│   ├── futures v0.3.30
+│   │   ├── futures-channel v0.3.30
+│   │   │   ├── futures-core v0.3.30
+│   │   │   └── futures-sink v0.3.30
+│   │   ├── futures-core v0.3.30
+│   │   ├── futures-executor v0.3.30
+│   │   │   ├── futures-core v0.3.30
+│   │   │   ├── futures-task v0.3.30
+│   │   │   └── futures-util v0.3.30
+│   │   │       ├── futures-channel v0.3.30 (*)
+│   │   │       ├── futures-core v0.3.30
+│   │   │       ├── futures-io v0.3.30
+│   │   │       ├── futures-macro v0.3.30 (proc-macro)
+│   │   │       │   ├── proc-macro2 v1.0.86 (*)
+│   │   │       │   ├── quote v1.0.37 (*)
+│   │   │       │   └── syn v2.0.77 (*)
+│   │   │       ├── futures-sink v0.3.30
+│   │   │       ├── futures-task v0.3.30
+│   │   │       ├── memchr v2.7.4
+│   │   │       ├── pin-project-lite v0.2.14
+│   │   │       ├── pin-utils v0.1.0
+│   │   │       └── slab v0.4.9
+│   │   │           [build-dependencies]
+│   │   │           └── autocfg v1.3.0
+│   │   ├── futures-io v0.3.30
+│   │   ├── futures-sink v0.3.30
+│   │   ├── futures-task v0.3.30
+│   │   └── futures-util v0.3.30 (*)
+│   └── tokio v1.40.0
+│       ├── bytes v1.7.1
+│       ├── libc v0.2.158
+│       ├── mio v1.0.2
+│       │   └── libc v0.2.158
+│       ├── pin-project-lite v0.2.14
+│       ├── socket2 v0.5.7
+│       │   └── libc v0.2.158
+│       └── tokio-macros v2.4.0 (proc-macro)
+│           ├── proc-macro2 v1.0.86 (*)
+│           ├── quote v1.0.37 (*)
+│           └── syn v2.0.77 (*)
+├── anyhow v1.0.86
+├── bytes v1.7.1
+├── corlib v0.3.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/corlib)
+│   └── delegate v0.13.0 (proc-macro) (*)
+├── delegate v0.13.0 (proc-macro) (*)
+├── fastwebsockets v0.8.0
+│   ├── base64 v0.21.7
+│   ├── bytes v1.7.1
+│   ├── http-body-util v0.1.2
+│   │   ├── bytes v1.7.1
+│   │   ├── futures-util v0.3.30 (*)
+│   │   ├── http v1.1.0
+│   │   │   ├── bytes v1.7.1
+│   │   │   ├── fnv v1.0.7
+│   │   │   └── itoa v1.0.11
+│   │   ├── http-body v1.0.1
+│   │   │   ├── bytes v1.7.1
+│   │   │   └── http v1.1.0 (*)
+│   │   └── pin-project-lite v0.2.14
+│   ├── hyper v1.4.1
+│   │   ├── bytes v1.7.1
+│   │   ├── futures-channel v0.3.30 (*)
+│   │   ├── futures-util v0.3.30 (*)
+│   │   ├── http v1.1.0 (*)
+│   │   ├── http-body v1.0.1 (*)
+│   │   ├── httparse v1.9.4
+│   │   ├── httpdate v1.0.3
+│   │   ├── itoa v1.0.11
+│   │   ├── pin-project-lite v0.2.14
+│   │   ├── smallvec v1.13.2
+│   │   ├── tokio v1.40.0 (*)
+│   │   └── want v0.3.1
+│   │       └── try-lock v0.2.5
+│   ├── hyper-util v0.1.7
+│   │   ├── bytes v1.7.1
+│   │   ├── futures-util v0.3.30 (*)
+│   │   ├── http v1.1.0 (*)
+│   │   ├── http-body v1.0.1 (*)
+│   │   ├── hyper v1.4.1 (*)
+│   │   ├── pin-project-lite v0.2.14
+│   │   └── tokio v1.40.0 (*)
+│   ├── pin-project v1.1.5
+│   │   └── pin-project-internal v1.1.5 (proc-macro)
+│   │       ├── proc-macro2 v1.0.86 (*)
+│   │       ├── quote v1.0.37 (*)
+│   │       └── syn v2.0.77 (*)
+│   ├── rand v0.8.5
+│   │   ├── libc v0.2.158
+│   │   ├── rand_chacha v0.3.1
+│   │   │   ├── ppv-lite86 v0.2.20
+│   │   │   │   └── zerocopy v0.7.35
+│   │   │   │       ├── byteorder v1.5.0
+│   │   │   │       └── zerocopy-derive v0.7.35 (proc-macro)
+│   │   │   │           ├── proc-macro2 v1.0.86 (*)
+│   │   │   │           ├── quote v1.0.37 (*)
+│   │   │   │           └── syn v2.0.77 (*)
+│   │   │   └── rand_core v0.6.4
+│   │   │       └── getrandom v0.2.15
+│   │   │           ├── cfg-if v1.0.0
+│   │   │           └── libc v0.2.158
+│   │   └── rand_core v0.6.4 (*)
+│   ├── sha1 v0.10.6
+│   │   ├── cfg-if v1.0.0
+│   │   ├── cpufeatures v0.2.13
+│   │   └── digest v0.10.7
+│   │       ├── block-buffer v0.10.4
+│   │       │   └── generic-array v0.14.7
+│   │       │       └── typenum v1.17.0
+│   │       │       [build-dependencies]
+│   │       │       └── version_check v0.9.5
+│   │       └── crypto-common v0.1.6
+│   │           ├── generic-array v0.14.7 (*)
+│   │           └── typenum v1.17.0
+│   ├── simdutf8 v0.1.4
+│   ├── thiserror v1.0.63
+│   │   └── thiserror-impl v1.0.63 (proc-macro)
+│   │       ├── proc-macro2 v1.0.86 (*)
+│   │       ├── quote v1.0.37 (*)
+│   │       └── syn v2.0.77 (*)
+│   ├── tokio v1.40.0 (*)
+│   └── utf-8 v0.7.6
+├── gtk_estate v0.3.0
+│   ├── cfg-if v1.0.0
+│   ├── corlib v0.3.0
+│   │   └── delegate v0.13.0 (proc-macro) (*)
+│   ├── delegate v0.13.0 (proc-macro) (*)
+│   ├── gtk4 v0.8.2
+│   │   ├── cairo-rs v0.19.4
+│   │   │   ├── bitflags v2.6.0
+│   │   │   ├── cairo-sys-rs v0.19.2
+│   │   │   │   ├── glib-sys v0.19.8
+│   │   │   │   │   └── libc v0.2.158
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── system-deps v6.2.2
+│   │   │   │   │       ├── cfg-expr v0.15.8
+│   │   │   │   │       │   ├── smallvec v1.13.2
+│   │   │   │   │       │   └── target-lexicon v0.12.16
+│   │   │   │   │       ├── heck v0.5.0
+│   │   │   │   │       ├── pkg-config v0.3.30
+│   │   │   │   │       ├── toml v0.8.19
+│   │   │   │   │       │   ├── serde v1.0.209
+│   │   │   │   │       │   ├── serde_spanned v0.6.7
+│   │   │   │   │       │   │   └── serde v1.0.209
+│   │   │   │   │       │   ├── toml_datetime v0.6.8
+│   │   │   │   │       │   │   └── serde v1.0.209
+│   │   │   │   │       │   └── toml_edit v0.22.20
+│   │   │   │   │       │       ├── indexmap v2.5.0
+│   │   │   │   │       │       │   ├── equivalent v1.0.1
+│   │   │   │   │       │       │   └── hashbrown v0.14.5
+│   │   │   │   │       │       ├── serde v1.0.209
+│   │   │   │   │       │       ├── serde_spanned v0.6.7 (*)
+│   │   │   │   │       │       ├── toml_datetime v0.6.8 (*)
+│   │   │   │   │       │       └── winnow v0.6.18
+│   │   │   │   │       └── version-compare v0.2.0
+│   │   │   │   └── libc v0.2.158
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── system-deps v6.2.2 (*)
+│   │   │   ├── glib v0.19.9
+│   │   │   │   ├── bitflags v2.6.0
+│   │   │   │   ├── futures-channel v0.3.30 (*)
+│   │   │   │   ├── futures-core v0.3.30
+│   │   │   │   ├── futures-executor v0.3.30 (*)
+│   │   │   │   ├── futures-task v0.3.30
+│   │   │   │   ├── futures-util v0.3.30 (*)
+│   │   │   │   ├── gio-sys v0.19.8
+│   │   │   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   │   │   ├── gobject-sys v0.19.8
+│   │   │   │   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   │   │   │   └── libc v0.2.158
+│   │   │   │   │   │   [build-dependencies]
+│   │   │   │   │   │   └── system-deps v6.2.2 (*)
+│   │   │   │   │   └── libc v0.2.158
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── system-deps v6.2.2 (*)
+│   │   │   │   ├── glib-macros v0.19.9 (proc-macro)
+│   │   │   │   │   ├── heck v0.5.0
+│   │   │   │   │   ├── proc-macro-crate v3.2.0
+│   │   │   │   │   │   └── toml_edit v0.22.20 (*)
+│   │   │   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   ├── quote v1.0.37 (*)
+│   │   │   │   │   └── syn v2.0.77 (*)
+│   │   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   │   ├── gobject-sys v0.19.8 (*)
+│   │   │   │   ├── libc v0.2.158
+│   │   │   │   ├── memchr v2.7.4
+│   │   │   │   ├── smallvec v1.13.2
+│   │   │   │   └── thiserror v1.0.63 (*)
+│   │   │   ├── libc v0.2.158
+│   │   │   └── thiserror v1.0.63 (*)
+│   │   ├── field-offset v0.3.6
+│   │   │   └── memoffset v0.9.1
+│   │   │       [build-dependencies]
+│   │   │       └── autocfg v1.3.0
+│   │   │   [build-dependencies]
+│   │   │   └── rustc_version v0.4.1
+│   │   │       └── semver v1.0.23
+│   │   ├── futures-channel v0.3.30 (*)
+│   │   ├── gdk-pixbuf v0.19.8
+│   │   │   ├── gdk-pixbuf-sys v0.19.8
+│   │   │   │   ├── gio-sys v0.19.8 (*)
+│   │   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   │   ├── gobject-sys v0.19.8 (*)
+│   │   │   │   └── libc v0.2.158
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── system-deps v6.2.2 (*)
+│   │   │   ├── gio v0.19.8
+│   │   │   │   ├── futures-channel v0.3.30 (*)
+│   │   │   │   ├── futures-core v0.3.30
+│   │   │   │   ├── futures-io v0.3.30
+│   │   │   │   ├── futures-util v0.3.30 (*)
+│   │   │   │   ├── gio-sys v0.19.8 (*)
+│   │   │   │   ├── glib v0.19.9 (*)
+│   │   │   │   ├── libc v0.2.158
+│   │   │   │   ├── pin-project-lite v0.2.14
+│   │   │   │   ├── smallvec v1.13.2
+│   │   │   │   └── thiserror v1.0.63 (*)
+│   │   │   ├── glib v0.19.9 (*)
+│   │   │   └── libc v0.2.158
+│   │   ├── gdk4 v0.8.2
+│   │   │   ├── cairo-rs v0.19.4 (*)
+│   │   │   ├── gdk-pixbuf v0.19.8 (*)
+│   │   │   ├── gdk4-sys v0.8.2
+│   │   │   │   ├── cairo-sys-rs v0.19.2 (*)
+│   │   │   │   ├── gdk-pixbuf-sys v0.19.8 (*)
+│   │   │   │   ├── gio-sys v0.19.8 (*)
+│   │   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   │   ├── gobject-sys v0.19.8 (*)
+│   │   │   │   ├── libc v0.2.158
+│   │   │   │   └── pango-sys v0.19.8
+│   │   │   │       ├── glib-sys v0.19.8 (*)
+│   │   │   │       ├── gobject-sys v0.19.8 (*)
+│   │   │   │       └── libc v0.2.158
+│   │   │   │       [build-dependencies]
+│   │   │   │       └── system-deps v6.2.2 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   ├── pkg-config v0.3.30
+│   │   │   │   └── system-deps v6.2.2 (*)
+│   │   │   ├── gio v0.19.8 (*)
+│   │   │   ├── glib v0.19.9 (*)
+│   │   │   ├── libc v0.2.158
+│   │   │   └── pango v0.19.8
+│   │   │       ├── gio v0.19.8 (*)
+│   │   │       ├── glib v0.19.9 (*)
+│   │   │       ├── libc v0.2.158
+│   │   │       └── pango-sys v0.19.8 (*)
+│   │   ├── gio v0.19.8 (*)
+│   │   ├── glib v0.19.9 (*)
+│   │   ├── graphene-rs v0.19.8
+│   │   │   ├── glib v0.19.9 (*)
+│   │   │   ├── graphene-sys v0.19.8
+│   │   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   │   └── libc v0.2.158
+│   │   │   │   [build-dependencies]
+│   │   │   │   ├── pkg-config v0.3.30
+│   │   │   │   └── system-deps v6.2.2 (*)
+│   │   │   └── libc v0.2.158
+│   │   ├── gsk4 v0.8.2
+│   │   │   ├── cairo-rs v0.19.4 (*)
+│   │   │   ├── gdk4 v0.8.2 (*)
+│   │   │   ├── glib v0.19.9 (*)
+│   │   │   ├── graphene-rs v0.19.8 (*)
+│   │   │   ├── gsk4-sys v0.8.2
+│   │   │   │   ├── cairo-sys-rs v0.19.2 (*)
+│   │   │   │   ├── gdk4-sys v0.8.2 (*)
+│   │   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   │   ├── gobject-sys v0.19.8 (*)
+│   │   │   │   ├── graphene-sys v0.19.8 (*)
+│   │   │   │   ├── libc v0.2.158
+│   │   │   │   └── pango-sys v0.19.8 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── system-deps v6.2.2 (*)
+│   │   │   ├── libc v0.2.158
+│   │   │   └── pango v0.19.8 (*)
+│   │   ├── gtk4-macros v0.8.2 (proc-macro)
+│   │   │   ├── proc-macro-crate v3.2.0 (*)
+│   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   ├── quote v1.0.37 (*)
+│   │   │   └── syn v2.0.77 (*)
+│   │   ├── gtk4-sys v0.8.2
+│   │   │   ├── cairo-sys-rs v0.19.2 (*)
+│   │   │   ├── gdk-pixbuf-sys v0.19.8 (*)
+│   │   │   ├── gdk4-sys v0.8.2 (*)
+│   │   │   ├── gio-sys v0.19.8 (*)
+│   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   ├── gobject-sys v0.19.8 (*)
+│   │   │   ├── graphene-sys v0.19.8 (*)
+│   │   │   ├── gsk4-sys v0.8.2 (*)
+│   │   │   ├── libc v0.2.158
+│   │   │   └── pango-sys v0.19.8 (*)
+│   │   │   [build-dependencies]
+│   │   │   └── system-deps v6.2.2 (*)
+│   │   ├── libc v0.2.158
+│   │   └── pango v0.19.8 (*)
+│   ├── libadwaita v0.6.0
+│   │   ├── gdk-pixbuf v0.19.8 (*)
+│   │   ├── gdk4 v0.8.2 (*)
+│   │   ├── gio v0.19.8 (*)
+│   │   ├── glib v0.19.9 (*)
+│   │   ├── gtk4 v0.8.2 (*)
+│   │   ├── libadwaita-sys v0.6.0
+│   │   │   ├── gdk4-sys v0.8.2 (*)
+│   │   │   ├── gio-sys v0.19.8 (*)
+│   │   │   ├── glib-sys v0.19.8 (*)
+│   │   │   ├── gobject-sys v0.19.8 (*)
+│   │   │   ├── gtk4-sys v0.8.2 (*)
+│   │   │   ├── libc v0.2.158
+│   │   │   └── pango-sys v0.19.8 (*)
+│   │   │   [build-dependencies]
+│   │   │   └── system-deps v6.2.2 (*)
+│   │   ├── libc v0.2.158
+│   │   └── pango v0.19.8 (*)
+│   └── paste v1.0.15 (proc-macro)
+├── http-body-util v0.1.2 (*)
+├── hyper v1.4.1 (*)
+├── hyper-util v0.1.7 (*)
+├── libsync v0.1.0 (/run/media/paul/Main Stuff/SoftwareProjects/Rust/libsync)
+│   ├── crossbeam v0.8.4
+│   │   ├── crossbeam-channel v0.5.13
+│   │   │   └── crossbeam-utils v0.8.20
+│   │   ├── crossbeam-deque v0.8.5
+│   │   │   ├── crossbeam-epoch v0.9.18
+│   │   │   │   └── crossbeam-utils v0.8.20
+│   │   │   └── crossbeam-utils v0.8.20
+│   │   ├── crossbeam-epoch v0.9.18 (*)
+│   │   ├── crossbeam-queue v0.3.11
+│   │   │   └── crossbeam-utils v0.8.20
+│   │   └── crossbeam-utils v0.8.20
+│   ├── delegate v0.13.0 (proc-macro) (*)
+│   ├── futures v0.3.30 (*)
+│   └── tokio v1.40.0 (*)
+├── paste v1.0.15 (proc-macro)
+├── pretty_goodness v0.1.1
+│   ├── corlib v0.1.0
+│   │   ├── delegate v0.13.0 (proc-macro) (*)
+│   │   └── paste v1.0.15 (proc-macro)
+│   └── paste v1.0.15 (proc-macro)
+├── serde_json v1.0.127
+│   ├── itoa v1.0.11
+│   ├── memchr v2.7.4
+│   ├── ryu v1.0.18
+│   └── serde v1.0.209
+├── tokio v1.40.0 (*)
+└── url v2.5.2
+    ├── form_urlencoded v1.2.1
+    │   └── percent-encoding v2.3.1
+    ├── idna v0.5.0
+    │   ├── unicode-bidi v0.3.15
+    │   └── unicode-normalization v0.1.23
+    │       └── tinyvec v1.8.0
+    │           └── tinyvec_macros v0.1.1
+    └── percent-encoding v2.3.1
+

@@ -1,18 +1,25 @@
 use std::future::Future;
 
-use fastwebsockets::{FragmentCollectorRead, Frame, WebSocketError, WebSocketRead};
+use fastwebsockets::{FragmentCollectorRead, Frame, WebSocketError, WebSocketRead, WebSocketWrite};
 
 use hyper::upgrade::Upgraded;
 
 use hyper_util::rt::TokioIo;
 
+use tokio::io::{ReadHalf, WriteHalf};
+
+
+
+pub type WebSocketReadHalf = WebSocketRead<ReadHalf<TokioIo<Upgraded>>>;
+
+pub type WebSocketWriteHalf = WebSocketWrite<WriteHalf<TokioIo<Upgraded>>>;
 
 //#[derive(Debug)]
-enum WebSocketReader
+pub enum WebSocketReader
 {
 
-    WebSocketRead(WebSocketRead<TokioIo<Upgraded>>),
-    FragmentCollectorRead(FragmentCollectorRead<TokioIo<Upgraded>>)
+    WebSocketRead(WebSocketReadHalf),
+    FragmentCollectorRead(FragmentCollectorRead<ReadHalf<TokioIo<Upgraded>>>)
 
 }
 
