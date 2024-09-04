@@ -65,7 +65,7 @@ use paste::paste;
 
 use std::sync::atomic::Ordering;
 
-use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Incrementor;
+//use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Incrementor;
 
 //use super::WebSocketActorStateBuilder;
 
@@ -735,6 +735,8 @@ impl WebSocketActorState
 
                 self.pipline_output_count_incrementor.inc();
 
+                //Return the writer side.
+
                 return CLEROrConnected::Connected(write);
 
             },
@@ -1346,6 +1348,20 @@ struct ReadWebSocketActorState
 
 }
 
+impl WebSocketActorState
+{
+
+    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, input_receiver: Receiver<WebSocketActorInputMessage>, pipline_output_count_incrementor: Incrementor) -> Self //in_the_read_pipeline_count: Arc<AtomicUsize>, //(Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
+    {
+
+        Self
+        {
+
+        }
+
+    }
+
+}
 
 
 /*

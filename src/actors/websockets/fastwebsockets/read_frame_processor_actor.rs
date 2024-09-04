@@ -4,7 +4,7 @@ use fastwebsockets::OpCode;
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
-use super::{pipeline_message_counter::Decrementor, OwnedFrame, ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage}; //, WebSocketActorOutputMessage};
+use super::{OwnedFrame, ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorOutputClientMessage}; //pipeline_message_counter::Decrementor,  //, WebSocketActorOutputMessage};
 
 use std::{borrow::Cow, rc::Rc, sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}};
 
@@ -28,14 +28,14 @@ pub struct ReadFrameProcessorActorState
 
     //io_client: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //Should really only be on the "client side".
     io_server: ActorIOServer<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
-    in_the_read_pipeline_count: Decrementor //Arc<AtomicUsize>
+    //in_the_read_pipeline_count: Decrementor //Arc<AtomicUsize>
 
 }
 
 impl ReadFrameProcessorActorState
 {
 
-    pub fn new(in_the_read_pipeline_count: Decrementor) -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //&Arc<AtomicUsize> //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new() -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize> //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         /*
@@ -59,16 +59,16 @@ impl ReadFrameProcessorActorState
 
             //io_client,
             io_server,
-            in_the_read_pipeline_count //: in_the_read_pipeline_count.clone()
+            //in_the_read_pipeline_count //: in_the_read_pipeline_count.clone()
 
         })
 
     }
 
-    pub fn spawn(in_the_read_pipeline_count: Decrementor) -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage> //&Arc<AtomicUsize>
+    pub fn spawn() -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage> //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize>
     {
 
-        let (io_client, state) = ReadFrameProcessorActorState::new(in_the_read_pipeline_count);
+        let (io_client, state) = ReadFrameProcessorActorState::new(); //in_the_read_pipeline_count);
 
         ReadFrameProcessorActor::spawn(state);
 
@@ -144,7 +144,7 @@ impl ReadFrameProcessorActorState
                 
             }
 
-            self.in_the_read_pipeline_count.dec();
+            //self.in_the_read_pipeline_count.dec();
 
             return true;
 

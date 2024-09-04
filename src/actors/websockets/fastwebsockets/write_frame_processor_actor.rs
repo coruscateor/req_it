@@ -8,20 +8,25 @@ use corlib::{impl_get_ref};
 
 use fastwebsockets::{OpCode, Payload};
 
-use tokio::sync::mpsc::{Sender, Receiver, channel};
+//use tokio::sync::mpsc::{Sender, Receiver, channel};
 
 use tokio::task::JoinHandle;
 
 use paste::paste;
 
-use super::pipeline_message_counter::{inc_dec, Decrementor};
+//use super::pipeline_message_counter::{inc_dec, Decrementor};
+
 use super::{ProcessingFormat, ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage, ReadFrameProcessorActorState, WebSocketActor, WebSocketActorInputMessage, WebSocketActorState, WriteFrameProcessorActorInputMessage};
 
 //WebSocketActorOutputMessage,
 
 use super::OwnedFrame;
 
-use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Incrementor;
+//use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Incrementor;
+
+use libsync::std::{PipelineMessageCounter, IncrementedPipelineMessageCounter, CountedPipelineMessage};
+
+use libsync::crossbeam::mpmc::tokio::array_queue::{Sender, Receiver, channel};
 
 use delegate::delegate;
 
@@ -35,14 +40,15 @@ pub struct WriteFrameProcessorActorIOClient
     //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
     read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
     //in_the_read_pipeline_count: Arc<AtomicUsize>
-    pipeline_message_count_decrementor: Decrementor
+    //pipeline_message_count_decrementor: Decrementor
+    pmc: PipelineMessageCounter
 
 }
 
 impl WriteFrameProcessorActorIOClient
 {
 
-    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_input_sender: Sender<WebSocketActorInputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, pipeline_message_count_decrementor: Decrementor) -> Self  //, incrementor: Incrementor) -> Self  //in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
+    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_input_sender: Sender<WebSocketActorInputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, pmc: PipelineMessageCounter) -> Self  //, pipeline_message_count_decrementor: Decrementor) -> Self  //, incrementor: Incrementor) -> Self  //in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
     {
 
         Self
@@ -54,7 +60,8 @@ impl WriteFrameProcessorActorIOClient
             web_socket_input_sender,
             read_frame_actor_io_client,
             //in_the_read_pipeline_count //: in_the_read_pipeline_count.clone()
-            pipeline_message_count_decrementor
+            //pipeline_message_count_decrementor
+            pmc
 
         }
 
@@ -71,12 +78,22 @@ impl WriteFrameProcessorActorIOClient
     impl_get_ref!(read_frame_actor_io_client, ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>);
 
     delegate! {
+        to self.pmc {
+
+            pub fn has_messages(&self) -> bool;
+
+        }
+    }
+
+    /*
+    delegate! {
         to self.pipeline_message_count_decrementor {
 
             pub fn has_messages(&self) -> bool;
 
         }
     }
+    */
 
     /*
     pub fn read_frame_proccessor_output_receiver(&self) -> &Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>
@@ -125,7 +142,7 @@ impl WriteFrameProcessorActorState
 
         let (sender, receiver) = channel(1000);
 
-        let (pipeline_message_count_incrementor, pipeline_message_count_decrementor) = inc_dec();
+        //let (pipeline_message_count_incrementor, pipeline_message_count_decrementor) = inc_dec();
 
         //let (read_frame_proccessor_input_sender, read_frame_proccessor_input_receiver) = channel(1000);
 
@@ -137,7 +154,7 @@ impl WriteFrameProcessorActorState
 
         //Last Stage
 
-        let read_frame_processor_actor_io_client = ReadFrameProcessorActorState::spawn(pipeline_message_count_decrementor.clone()); //&in_the_read_pipeline_count); //read_frame_proccessor_input_receiver));
+        let read_frame_processor_actor_io_client = ReadFrameProcessorActorState::spawn(); //pipeline_message_count_decrementor.clone()); //&in_the_read_pipeline_count); //read_frame_proccessor_input_receiver));
 
         //let read_frame_proccessor_output_receiver = read_frame_processor_actor.interactor().clone();
 

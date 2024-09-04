@@ -1,6 +1,22 @@
 
 use std::sync::{atomic::{AtomicU64, Ordering}, Arc};
 
+struct PipelineMessageCounter
+{
+
+    
+
+}
+
+
+pub struct PipelineMessageCounter
+{
+
+
+
+}
+
+/*
 #[derive(Clone)]
 pub struct Incrementor
 {
@@ -34,7 +50,7 @@ impl Incrementor
     pub fn count(&self) -> u64
     {
 
-        self.count.load(Ordering::Acquire)//Ordering::SeqCst) //Ordering::Acquire)
+        self.count.load(Ordering::Acquire) //Ordering::SeqCst) //Ordering::Acquire)
 
     }
 
@@ -115,3 +131,4 @@ pub fn inc_dec() -> (Incrementor, Decrementor)
     (Incrementor::new(count.clone()), Decrementor::new(count))
 
 }
+*/
