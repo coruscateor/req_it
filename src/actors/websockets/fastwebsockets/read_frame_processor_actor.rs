@@ -1,6 +1,8 @@
-use act_rs::{impl_default_start_and_end_async, impl_default_start_async, impl_default_end_async, impl_mac_task_actor, tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io}};
+use act_rs::{impl_default_start_and_end_async, impl_default_start_async, impl_default_end_async, impl_mac_task_actor}; //, tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io}
 
 use fastwebsockets::OpCode;
+
+use libsync::std::{MutCountedPipelineMessage, PipelineMessageCounter};
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
@@ -16,6 +18,8 @@ use paste::paste;
 
 //super::OwnedFrame;
 
+use super::array_queue::{ActorIOClient, ActorIOServer, actor_io};
+
 pub struct ReadFrameProcessorActorState
 {
 
@@ -27,15 +31,16 @@ pub struct ReadFrameProcessorActorState
     */
 
     //io_client: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //Should really only be on the "client side".
-    io_server: ActorIOServer<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
+    io_server: ActorIOServer<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
     //in_the_read_pipeline_count: Decrementor //Arc<AtomicUsize>
+    pipeline_message_counter: PipelineMessageCounter
 
 }
 
 impl ReadFrameProcessorActorState
 {
 
-    pub fn new() -> (ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, Self) //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize> //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(pipeline_message_counter: &PipelineMessageCounter) -> (ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, Self) //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize> //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         /*
@@ -60,15 +65,16 @@ impl ReadFrameProcessorActorState
             //io_client,
             io_server,
             //in_the_read_pipeline_count //: in_the_read_pipeline_count.clone()
+            pipeline_message_counter: pipeline_message_counter.clone()
 
         })
 
     }
 
-    pub fn spawn() -> ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage> //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize>
+    pub fn spawn(pipeline_message_counter: &PipelineMessageCounter) -> ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage> //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize>
     {
 
-        let (io_client, state) = ReadFrameProcessorActorState::new(); //in_the_read_pipeline_count);
+        let (io_client, state) = ReadFrameProcessorActorState::new(pipeline_message_counter); //in_the_read_pipeline_count);
 
         ReadFrameProcessorActor::spawn(state);
 
@@ -83,68 +89,65 @@ impl ReadFrameProcessorActorState
     async fn run_async(&mut self) -> bool
     {
 
-        if let Some(message) = self.io_server.input_receiver().recv().await //.input_receiver.recv().await
+        if let Some(mut message) = self.io_server.input_receiver().recv().await //.input_receiver.recv().await
         {
 
-            //let output;
-
-            match message
+            if let Some(contained_message) = message.take()
             {
 
-                ReadFrameProcessorActorInputMessage::Frame(frame) =>
+                match contained_message
                 {
 
-                    let output = Self::format_output(frame);
-
-                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await
+                    ReadFrameProcessorActorInputMessage::Frame(frame) =>
                     {
 
-                        return false;
+                        let output = Self::format_output(frame);
+
+                        if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await
+                        {
+
+                            return false;
+
+                        }
 
                     }
+                    ReadFrameProcessorActorInputMessage::ClientMessage(message) =>
+                    {
 
-                    //.fetch_sub(1, Ordering::SeqCst);
+                        //Client messages get passed through to the UI.
+                        
+                        if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::ClientMessage(message)).await
+                        {
 
-                }
-                ReadFrameProcessorActorInputMessage::ClientMessage(message) =>
-                {
+                            return false;
 
-                    //Client messages get passed through to the UI.
+                        }
+
+                    }
+                    ReadFrameProcessorActorInputMessage::FrameAndMessage(frame, message) =>
+                    {
+
+                        if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::ClientMessage(message)).await
+                        {
+
+                            return false;
+
+                        }
+
+                        let output = Self::format_output(frame);
+
+                        if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await
+                        {
+
+                            return false;
+
+                        }
+
+                    }
                     
-                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::ClientMessage(message)).await
-                    {
-
-                        return false;
-
-                    }
-
                 }
-                ReadFrameProcessorActorInputMessage::FrameAndMessage(frame, message) =>
-                {
-
-                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::ClientMessage(message)).await
-                    {
-
-                        return false;
-
-                    }
-
-                    let output = Self::format_output(frame);
-
-                    if let Err(_err) = self.io_server.output_sender().send(ReadFrameProcessorActorOutputMessage::Processed(output)).await
-                    {
-
-                        return false;
-
-                    }
-
-                    //self.in_the_read_pipeline_count.fetch_sub(1, Ordering::SeqCst);
-
-                }
-                
+            
             }
-
-            //self.in_the_read_pipeline_count.dec();
 
             return true;
 

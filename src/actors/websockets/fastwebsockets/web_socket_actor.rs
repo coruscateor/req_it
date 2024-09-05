@@ -2,7 +2,7 @@ use act_rs::{impl_default_end_async, impl_default_start_and_end_async, impl_defa
 
 //impl_mac_runtime_task_actor
 
-use act_rs::tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io};
+//use act_rs::tokio::io::mpsc::{ActorIOClient, ActorIOServer, actor_io};
 
 use fastwebsockets::{handshake, FragmentCollector, FragmentCollectorRead, Frame, OpCode, WebSocket, WebSocketError, WebSocketRead, WebSocketWrite};
 
@@ -18,6 +18,8 @@ use hyper::body::Incoming;
 
 use hyper::Response;
 
+use libsync::std::{CountedPipelineMessage, IncrementedPipelineMessageCounter, MutCountedPipelineMessage, PipelineMessageCounter}
+
 use tokio::io::{self, AsyncWriteExt, ReadHalf, WriteHalf};
 
 use tokio::select;
@@ -28,7 +30,6 @@ use tokio::select;
 
 use url::Url;
 
-use std::cell::RefCell;
 use std::future::Future;
 
 use std::sync::atomic::{AtomicI32, AtomicUsize};
@@ -59,11 +60,12 @@ use tokio::task::JoinHandle;
 use crate::actors::websockets::fastwebsockets::{OwnedFrame, ReadFrameProcessorActorInputMessage}; //, WebSocketActorOutputServerMessage};
 
 use super::websocket_read_and_write::{WebSocketReadHalf, WebSocketWriteHalf};
+
 use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage}; //, WebSocketConnectionState}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
 use paste::paste;
 
-use std::sync::atomic::Ordering;
+//use std::sync::atomic::Ordering;
 
 //use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Incrementor;
 
@@ -74,6 +76,8 @@ use tokio::time::timeout_at;
 use libsync::crossbeam::mpmc::tokio::array_queue::{Sender, Receiver, channel};
 
 use crate::actors::websockets::fastwebsockets::websocket_read_and_write::WebSocketReader;
+
+use super::array_queue::ActorIOClient;
 
 static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
@@ -142,7 +146,7 @@ enum ContinueOrConnected
 {
 
     ShouldContinue(bool),
-    Connected(WebSocketWrite<TokioIo<Upgraded>>)
+    Connected(WebSocketWriteHalf)  //WebSocketWrite<TokioIo<Upgraded>>)
 
 }
 
@@ -188,16 +192,17 @@ pub struct WebSocketActorState
 
     input_receiver: Receiver<WebSocketActorInputMessage>,
     url: Option<Url>, //Option<String>,
-    read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,
+    read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
     //in_the_read_pipeline_count: Arc<AtomicUsize>
-    pipline_output_count_incrementor: Incrementor
+    //pipline_output_count_incrementor: Incrementor
+    pipeline_message_counter: PipelineMessageCounter
 
 }
 
 impl WebSocketActorState
 {
 
-    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, input_receiver: Receiver<WebSocketActorInputMessage>, pipline_output_count_incrementor: Incrementor) -> Self //in_the_read_pipeline_count: Arc<AtomicUsize>, //(Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, input_sender: &Sender<WebSocketActorInputMessage>, input_receiver: Receiver<WebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Self //, pipline_output_count_incrementor: Incrementor //in_the_read_pipeline_count: Arc<AtomicUsize>, //(Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         Self
@@ -207,18 +212,19 @@ impl WebSocketActorState
             url: None,
             read_frame_processor_actor_io,
             //in_the_read_pipeline_count
-            pipline_output_count_incrementor
+            //pipline_output_count_incrementor
+            pipeline_message_counter: pipeline_message_counter.clone()
 
         }
 
     }
 
-    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>,  pipline_output_count_incrementor: Incrementor) -> Sender<WebSocketActorInputMessage> //in_the_read_pipeline_count: &Arc<AtomicUsize> //ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
+    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Sender<WebSocketActorInputMessage> //pipline_output_count_incrementor: Incrementor //in_the_read_pipeline_count: &Arc<AtomicUsize> //ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
     {
 
         let (input_sender, input_receiver) = channel(50);
 
-        let state = WebSocketActorState::new(read_frame_processor_actor_io, input_receiver, pipline_output_count_incrementor); //in_the_read_pipeline_count.clone(), 
+        let state = WebSocketActorState::new(read_frame_processor_actor_io, &input_sender, input_receiver, pipeline_message_counter); //pipline_output_count_incrementor); //in_the_read_pipeline_count.clone(), 
 
         WebSocketActor::spawn(state);
 
@@ -237,10 +243,10 @@ impl WebSocketActorState
     async fn run_async(&mut self) -> bool
     {
 
-        let recv_res = self.input_receiver.recv().await;
+        //let recv_res = self.input_receiver.recv().await;
 
-        //if let Some(message) = self.input_receiver.recv().await
-        if let Ok(message) = recv_res
+        if let Some(message) = self.input_receiver.recv().await
+        //if let Ok(message) = recv_res
         {
 
             let res = self.process_received_actor_input_message(message).await;
@@ -249,12 +255,12 @@ impl WebSocketActorState
             {
 
                 ContinueOrConnected::ShouldContinue(should_continue) => should_continue,
-                ContinueOrConnected::Connected(connection) =>
+                ContinueOrConnected::Connected(web_socket_writer) =>
                 {
 
                     //Connected loop
     
-                    if !self.connected_loop(connection).await
+                    if !self.connected_loop(web_socket_writer).await
                     {
     
                         return false;
@@ -387,7 +393,7 @@ impl WebSocketActorState
     ///
     /// Shuts down and drops the connection. The WebSocket connection closure process should've been comnpleted by this point.
     /// 
-    async fn disconnect_from_server(&mut self, mut web_socket_reader: WebSocketReadHalf, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
+    async fn disconnect_from_server(&mut self, mut web_socket_writer: WebSocketWriteHalf, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
     {
 
         /*
@@ -398,7 +404,7 @@ impl WebSocketActorState
 
         //If received_close_frame is true, send the close response frame, otherwise initiate connection closure process.
 
-        if let Err(err) = self.send_close_frame(&mut current_connection).await
+        if let Err(err) = self.send_close_frame(&mut web_socket_writer).await
         {
 
             let res = self.on_web_socket_error_report_only(err).await;
@@ -406,7 +412,7 @@ impl WebSocketActorState
             if !Self::continue_or_not(&res)
             {
 
-                shutdown(current_connection).await;
+                //shutdown(current_connection).await;
 
                 return res;
 
@@ -416,16 +422,18 @@ impl WebSocketActorState
         else
         {
 
-            if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnecting(SendableText::Str(CLOSE_FRAME_SENT)))).await
+            let counted = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnecting(SendableText::Str(CLOSE_FRAME_SENT))));
+
+            if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(counted).await //ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnecting(SendableText::Str(CLOSE_FRAME_SENT)))).await
             {
 
-                shutdown(current_connection).await;
+                //shutdown(current_connection).await;
     
                 return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
     
             }
 
-            self.pipline_output_count_incrementor.inc();
+            //self.pipline_output_count_incrementor.inc();
 
         }
 
@@ -1183,12 +1191,12 @@ impl WebSocketActorState
     }
     */
 
-    async fn write_frame(&self, current_connection: &mut CurrentConnection, mut of: OwnedFrame) -> Result<(), WebSocketError>
+    async fn write_frame(&self, web_socket_writer: &mut WebSocketWriteHalf, mut of: OwnedFrame) -> Result<(), WebSocketError> //current_connection: &mut CurrentConnection
     {
 
         let frame = of.new_frame_to_be_written();
 
-        current_connection.write_frame(frame).await?;
+        web_socket_writer.write_frame(frame).await?;
 
         //Put OwnedFrame into cache...
 
@@ -1196,10 +1204,10 @@ impl WebSocketActorState
 
     }
 
-    async fn send_close_frame(&self, current_connection: &mut CurrentConnection) -> Result<(), WebSocketError>
+    async fn send_close_frame(&self, web_socket_writer: &mut WebSocketWriteHalf) -> Result<(), WebSocketError> //current_connection: &mut CurrentConnection
     {
 
-        current_connection.write_frame(Frame::close_raw(vec![].into())).await
+        web_socket_writer.write_frame(Frame::close_raw(vec![].into())).await
 
     }
 
@@ -1217,21 +1225,23 @@ impl WebSocketActorState
 
         //Force?
 
-        self.force_disconnection_from_server(current_connection).await //, received_close_frame).await
+        self.force_disconnection_from_server(web_socket_reader).await //, received_close_frame).await
 
     }
 
     async fn on_web_socket_error_report_only(&mut self, error: WebSocketError) -> Option<ConnectedLoopExitReason>
     {
 
-        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(SendableText::String(error.to_string())))).await
+        let message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionFailed(SendableText::String(error.to_string()))));
+
+        if let Err(_) = self.read_frame_processor_actor_io.input_sender().send(message).await
         {
 
             return Some(ConnectedLoopExitReason::ActorIOClientDisconnected);
 
         }
 
-        self.pipline_output_count_incrementor.inc();
+        //self.pipline_output_count_incrementor.inc();
 
         None
 
@@ -1340,22 +1350,56 @@ impl WebSocketActorState
 
 impl_mac_task_actor!(WebSocketActor);
 
-
-struct ReadWebSocketActorState
+enum ReadWebSocketActorInputMessage
 {
 
-
+    Connected(WebSocketReadHalf),
+    Disconnect
 
 }
 
-impl WebSocketActorState
+struct ReadWebSocketActorIOClient
 {
 
-    pub fn new(read_frame_processor_actor_io: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, input_receiver: Receiver<WebSocketActorInputMessage>, pipline_output_count_incrementor: Incrementor) -> Self //in_the_read_pipeline_count: Arc<AtomicUsize>, //(Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
+    input_sender: Sender<ReadWebSocketActorInputMessage>,
+
+}
+
+impl ReadWebSocketActorIOClient
+{
+
+    pub fn new(input_sender: Sender<ReadWebSocketActorInputMessage>) -> Self
     {
 
         Self
         {
+
+            input_sender
+
+        }
+        
+    }
+
+}
+
+
+struct ReadWebSocketActorIOServer
+{
+
+    input_receiver: Receiver<ReadWebSocketActorInputMessage>,
+
+}
+
+impl ReadWebSocketActorIOServer
+{
+
+    pub fn new(input_receiver: Receiver<ReadWebSocketActorInputMessage>) -> Self
+    {
+
+        Self
+        {
+
+            input_receiver
 
         }
 
@@ -1363,6 +1407,63 @@ impl WebSocketActorState
 
 }
 
+struct ReadWebSocketActorState
+{
+
+    io_server: ReadWebSocketActorIOServer,
+    read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
+    input_sender: Sender<ReadWebSocketActorInputMessage>,
+    pipeline_message_counter: PipelineMessageCounter
+
+}
+
+impl ReadWebSocketActorState
+{
+
+    pub fn new(read_frame_processor_actor_io: &ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, input_sender: &Sender<ReadWebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> (ReadWebSocketActorIOClient, Self)
+    {
+
+        let (sender, receiver) = channel(2);
+
+        //let received
+
+        (ReadWebSocketActorIOClient::new(sender),
+        Self
+        {
+
+            io_server: ReadWebSocketActorIOServer::new(receiver),
+            read_frame_processor_actor_io: read_frame_processor_actor_io.clone(),
+            input_sender: input_sender.clone(),
+            pipeline_message_counter: pipeline_message_counter.clone()
+
+        })
+
+    }
+
+    pub fn spawn(read_frame_processor_actor_io: &ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, input_sender: &Sender<ReadWebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> ReadWebSocketActorIOClient
+    {
+
+        let (io_client, state) = ReadWebSocketActorState::new(read_frame_processor_actor_io, input_sender, pipeline_message_counter);
+
+        ReadWebSocketActor::spawn(state);
+
+        io_client
+
+    }
+
+    impl_default_start_and_end_async!();
+
+    async fn run_async(&mut self) -> bool
+    {
+
+        true
+
+    }
+
+
+}
+
+impl_mac_task_actor!(ReadWebSocketActor);
 
 /*
 //Shutdown the current connection.
