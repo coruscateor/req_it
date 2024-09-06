@@ -69,20 +69,22 @@ impl OwnedFrame
             opcode: frame.opcode,
             payload
 
-
         }
 
     }
 
-    pub fn copy_from_read_frame(&mut self, frame: &Frame<'_>)
+    pub fn copy_all_from_read_frame(&mut self, frame: &Frame<'_>)
     {
 
         self.fin = frame.fin;
 
         self.opcode = frame.opcode;
 
+        self.copy_payload_from_read_frame(frame);
+
         //frame.write(&mut self.payload);
 
+        /*
         let payload = &mut self.payload;
 
         //let payload_len = payload.len();
@@ -98,7 +100,28 @@ impl OwnedFrame
 
         payload.copy_from_slice(&frame.payload);
         
+        */
+
     }
+
+    pub fn copy_payload_from_read_frame(&mut self, frame: &Frame<'_>)
+    {
+
+        let payload = &mut self.payload;
+
+        let frame_payload_len = frame.payload.len();
+
+        if payload.len() != frame_payload_len
+        {
+
+            payload.resize(frame_payload_len, 0)
+
+        }
+
+        payload.copy_from_slice(&frame.payload);
+        
+    }
+
 
     pub fn reset(&mut self,)
     {
@@ -216,6 +239,15 @@ impl OwnedFrame
 
     }
 
+    pub fn pong_setup_with_payload(&mut self, frame: &Frame<'_>)
+    {
+
+        self.pong_setup();
+
+        self.copy_payload_from_read_frame(frame);
+
+    }
+
     pub fn set_payload_from_str(&mut self, contents: &str)
     {
         
@@ -237,6 +269,13 @@ impl OwnedFrame
         //Copy the bytes into the OwnedFrame payload. 
 
         payload.copy_from_slice(content_bytes);
+
+    }
+
+    pub fn clear_payload(&mut self)
+    {
+
+        self.payload.clear();
 
     }
 

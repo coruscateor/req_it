@@ -18,7 +18,7 @@ use hyper::body::Incoming;
 
 use hyper::Response;
 
-use libsync::std::{CountedPipelineMessage, IncrementedPipelineMessageCounter, MutCountedPipelineMessage, PipelineMessageCounter}
+use libsync::std::{CountedPipelineMessage, IncrementedPipelineMessageCounter, CountedPipelineMessageMut, PipelineMessageCounter};
 
 use tokio::io::{self, AsyncWriteExt, ReadHalf, WriteHalf};
 
@@ -61,7 +61,7 @@ use crate::actors::websockets::fastwebsockets::{OwnedFrame, ReadFrameProcessorAc
 
 use super::websocket_read_and_write::{WebSocketReadHalf, WebSocketWriteHalf};
 
-use super::{ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage}; //, WebSocketConnectionState}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
+use super::{FromReadWebSocketActorMessage, ReadFrameProcessorActorOutputMessage, WebSocketActorInputMessage, WebSocketActorOutputClientMessage}; //, WebSocketConnectionState}; //, /WebSocketActorOutputClientMessage, WebSocketActorOutputMessage};
 
 use paste::paste;
 
@@ -192,7 +192,7 @@ pub struct WebSocketActorState
 
     input_receiver: Receiver<WebSocketActorInputMessage>,
     url: Option<Url>, //Option<String>,
-    read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
+    read_frame_processor_actor_io: ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
     //in_the_read_pipeline_count: Arc<AtomicUsize>
     //pipline_output_count_incrementor: Incrementor
     pipeline_message_counter: PipelineMessageCounter
@@ -202,7 +202,7 @@ pub struct WebSocketActorState
 impl WebSocketActorState
 {
 
-    pub fn new(read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, input_sender: &Sender<WebSocketActorInputMessage>, input_receiver: Receiver<WebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Self //, pipline_output_count_incrementor: Incrementor //in_the_read_pipeline_count: Arc<AtomicUsize>, //(Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(read_frame_processor_actor_io: ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, input_sender: &Sender<WebSocketActorInputMessage>, input_receiver: Receiver<WebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Self //, pipline_output_count_incrementor: Incrementor //in_the_read_pipeline_count: Arc<AtomicUsize>, //(Sender<WebSocketActorInputMessage>, Self) //(ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, Self) //read_frame_processor_actor: ReadFrameProcessorActor) -> Self //, read_frame_proccessor_input_sender: Sender<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         Self
@@ -219,7 +219,7 @@ impl WebSocketActorState
 
     }
 
-    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Sender<WebSocketActorInputMessage> //pipline_output_count_incrementor: Incrementor //in_the_read_pipeline_count: &Arc<AtomicUsize> //ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
+    pub fn spawn(read_frame_processor_actor_io: ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Sender<WebSocketActorInputMessage> //pipline_output_count_incrementor: Incrementor //in_the_read_pipeline_count: &Arc<AtomicUsize> //ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>
     {
 
         let (input_sender, input_receiver) = channel(50);
@@ -1410,22 +1410,25 @@ impl ReadWebSocketActorIOServer
 struct ReadWebSocketActorState
 {
 
-    io_server: ReadWebSocketActorIOServer,
-    read_frame_processor_actor_io: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
-    input_sender: Sender<ReadWebSocketActorInputMessage>,
-    pipeline_message_counter: PipelineMessageCounter
+    io_server: ReadWebSocketActorIOServer, //Output
+    read_frame_processor_actor_io: ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, //Where messages are sent.
+    //input_receiver: Receiver<ReadWebSocketActorInputMessage>, //Disconnect the reader?
+    websocket_writer_input_sender: Sender<WebSocketActorInputMessage>, //The WebSocket writer actor channel input. 
+    pipeline_message_counter: PipelineMessageCounter,
+    obligated_send_frame_sender: Sender<OwnedFrame>,
+    obligated_send_frame_receiver: Receiver<OwnedFrame>
 
 }
 
 impl ReadWebSocketActorState
 {
 
-    pub fn new(read_frame_processor_actor_io: &ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, input_sender: &Sender<ReadWebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> (ReadWebSocketActorIOClient, Self)
+    pub fn new(read_frame_processor_actor_io: &ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, websocket_writer_input_sender: &Sender<WebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> (ReadWebSocketActorIOClient, Self) //input_receiver: &Receiver<ReadWebSocketActorInputMessage>,
     {
 
-        let (sender, receiver) = channel(2);
+        let (sender, receiver) = channel(1);
 
-        //let received
+        let (obligated_send_frame_sender, obligated_send_frame_receiver) = channel(1);
 
         (ReadWebSocketActorIOClient::new(sender),
         Self
@@ -1433,17 +1436,20 @@ impl ReadWebSocketActorState
 
             io_server: ReadWebSocketActorIOServer::new(receiver),
             read_frame_processor_actor_io: read_frame_processor_actor_io.clone(),
-            input_sender: input_sender.clone(),
-            pipeline_message_counter: pipeline_message_counter.clone()
+            //input_sender: input_sender.clone(),
+            websocket_writer_input_sender: websocket_writer_input_sender.clone(),
+            pipeline_message_counter: pipeline_message_counter.clone(),
+            obligated_send_frame_sender,
+            obligated_send_frame_receiver
 
         })
 
     }
 
-    pub fn spawn(read_frame_processor_actor_io: &ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, input_sender: &Sender<ReadWebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> ReadWebSocketActorIOClient
+    pub fn spawn(read_frame_processor_actor_io: &ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, websocket_writer_input_sender: &Sender<WebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> ReadWebSocketActorIOClient //input_sender: &Sender<ReadWebSocketActorInputMessage>, 
     {
 
-        let (io_client, state) = ReadWebSocketActorState::new(read_frame_processor_actor_io, input_sender, pipeline_message_counter);
+        let (io_client, state) = ReadWebSocketActorState::new(read_frame_processor_actor_io, websocket_writer_input_sender, pipeline_message_counter); //input_sender, 
 
         ReadWebSocketActor::spawn(state);
 
@@ -1456,10 +1462,224 @@ impl ReadWebSocketActorState
     async fn run_async(&mut self) -> bool
     {
 
-        true
+        loop
+        {
+
+            match self.io_server.input_receiver.recv().await
+            {
+
+                Some(message) =>
+                {
+
+                    match message
+                    {
+
+                        ReadWebSocketActorInputMessage::Connected(read_half) =>
+                        {
+
+                            if !self.connected_loop(read_half).await
+                            {
+
+                                return false;
+
+                            }
+
+                        }
+                        ReadWebSocketActorInputMessage::Disconnect => { /* Continue */ }
+                    }
+
+                }
+                None => return false
+            }
+            
+        }
 
     }
 
+    async fn connected_loop(&mut self, mut read_half: WebSocketReadHalf) -> bool
+    {
+
+        enum SelectResult<'f>
+        {
+
+            ReadFrame(Result<Frame<'f>, WebSocketError>),
+            Connection(Option<ReadWebSocketActorInputMessage>)
+
+        }
+
+        //let should_continue = true;
+
+        let obligated_send_frame_sender = self.obligated_send_frame_sender.clone();
+
+        let mut send_fn = |obligated_send_frame: Frame|
+        {
+
+            //Get from cache
+
+            let mut of = OwnedFrame::new();
+
+            of.copy_all_from_read_frame(&obligated_send_frame);
+
+            async
+            {
+
+                obligated_send_frame_sender.send(of).await.expect("Should never panic.");
+
+                Result::<(), WebSocketError>::Ok(())
+
+            }
+
+        };
+
+        loop
+        {
+
+            let read_frame_future = read_half.read_frame(&mut send_fn);
+
+            let connection_future = self.io_server.input_receiver.recv();
+
+            let select_result;
+
+            select! {
+
+                res = read_frame_future =>
+                {
+
+                    select_result = SelectResult::ReadFrame(res);
+
+                }
+                res = connection_future =>
+                {
+
+                    select_result = SelectResult::Connection(res);
+
+                }
+
+            }
+
+            if let Ok(mut of) = self.obligated_send_frame_receiver.try_recv()
+            {
+
+                match of.opcode
+                {
+    
+                    OpCode::Close =>
+                    {
+    
+                        of.clear_payload();
+    
+                        if let Err(_err) = self.websocket_writer_input_sender.send(WebSocketActorInputMessage::WriteFrame(of)).await
+                        {
+        
+                            return false;
+        
+                        }
+    
+                    }
+                    OpCode::Ping =>
+                    {
+    
+                        //of.pong_setup_with_payload(&obligated_send_frame);
+
+                        of.pong_setup();
+    
+                        if let Err(_err) = self.websocket_writer_input_sender.send(WebSocketActorInputMessage::WriteFrame(of)).await
+                        {
+        
+                            return false;
+        
+                        }
+
+                    }
+                    OpCode::Continuation | OpCode::Text | OpCode::Binary | OpCode::Pong =>
+                    {   
+    
+                        //of.copy_all_from_read_frame(&obligated_send_frame);
+    
+                        let message = ReadFrameProcessorActorInputMessage::Frame(of);
+    
+                        let counted_message = self.pipeline_message_counter.increment_with_message_mut(message);
+    
+                        if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(counted_message).await
+                        {
+
+                            return false;
+
+                        }
+    
+                    }
+    
+                }
+
+            }
+
+            match select_result
+            {
+
+                SelectResult::ReadFrame(frame_res) =>
+                {
+
+                    match frame_res
+                    {
+
+                        Ok(frame) =>
+                        {
+
+                            //Get from cache
+
+                            let mut of = OwnedFrame::new();
+
+                            of.copy_all_from_read_frame(&frame);
+
+                            let message = ReadFrameProcessorActorInputMessage::Frame(of);
+    
+                            let counted_message = self.pipeline_message_counter.increment_with_message_mut(message);
+        
+                            if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(counted_message).await
+                            {
+    
+                                return false;
+    
+                            }
+
+                        }
+                        Err(err) =>
+                        {
+
+                            if let Err(_err) = self.websocket_writer_input_sender.send(WebSocketActorInputMessage::Disconnect).await
+                            {
+    
+                                return false;
+    
+                            }
+
+                            let message = ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionError(SendableText::String(err.to_string())));
+    
+                            let counted_message = self.pipeline_message_counter.increment_with_message_mut(message);
+        
+                            if let Err(_err) = self.read_frame_processor_actor_io.input_sender().send(counted_message).await
+                            {
+    
+                                return false;
+    
+                            }
+
+                        }
+
+                    }
+
+                }
+                SelectResult::Connection(input_opt) =>
+                {
+
+
+                }
+
+            }
+
+        }
+
+    }
 
 }
 

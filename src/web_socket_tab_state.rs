@@ -53,6 +53,7 @@ use corlib::rfc::{borrow, borrow_mut, borrow_mut_param};
 use gtk_estate::helpers::{widget_ext::set_hvexpand_t, text_view::get_text_view_string, paned::set_paned_position_halved};
 
 use hyper::client::conn::http1::Connection;
+use libsync::ReceiveError;
 use tokio::runtime::Handle;
 
 use widget_ext::{set_margin_sides_and_bottom, set_margin_start_and_end, set_margin_top_and_bottom};
@@ -1176,7 +1177,7 @@ impl WebSocketTabState
             up_rc_pt(sto.state(), |this|
             {
                 
-                let mut receiver = this.write_frame_processor_actor_io_client.read_frame_actor_io_client().output_receiver_lock().expect("Error: read_frame_actor_io_client().output_receiver_lock() panicked");
+                let mut receiver = this.write_frame_processor_actor_io_client.read_frame_actor_io_client().output_receiver(); //.try_recv(); //.output_receiver_lock().expect("Error: read_frame_actor_io_client().output_receiver_lock() panicked");
 
                 match receiver.try_recv()
                 {
@@ -1221,7 +1222,7 @@ impl WebSocketTabState
                                         this.set_status(ConnectionStatus::Connected);
 
                                     },
-                                    WebSocketActorOutputClientMessage::ConnectionFailed(message) =>
+                                    WebSocketActorOutputClientMessage::ConnectionError(message) =>
                                     {
 
                                         //mut_state.connection_status = ConnectionStatus::NotConnected;
@@ -1297,7 +1298,7 @@ impl WebSocketTabState
                         match err
                         {
 
-                            TryRecvError::Empty =>
+                            ReceiveError::Empty => //TryRecvError::Empty =>
                             {
 
                                 let connection_status = borrow(&this.mut_state, |mut_state|
@@ -1334,7 +1335,7 @@ impl WebSocketTabState
                                 */
 
                             },
-                            TryRecvError::Disconnected =>
+                            ReceiveError::NoSenders => //TryRecvError::Disconnected =>
                             {
 
                                 panic!("Error: The Read Frame Actor is non-functional");

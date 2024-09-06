@@ -2,7 +2,7 @@ use act_rs::{impl_default_start_and_end_async, impl_default_start_async, impl_de
 
 use fastwebsockets::OpCode;
 
-use libsync::std::{MutCountedPipelineMessage, PipelineMessageCounter};
+use libsync::std::{CountedPipelineMessageMut, PipelineMessageCounter};
 
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
@@ -31,7 +31,7 @@ pub struct ReadFrameProcessorActorState
     */
 
     //io_client: ActorIOInteractorClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, //Should really only be on the "client side".
-    io_server: ActorIOServer<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
+    io_server: ActorIOServer<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
     //in_the_read_pipeline_count: Decrementor //Arc<AtomicUsize>
     pipeline_message_counter: PipelineMessageCounter
 
@@ -40,7 +40,7 @@ pub struct ReadFrameProcessorActorState
 impl ReadFrameProcessorActorState
 {
 
-    pub fn new(pipeline_message_counter: &PipelineMessageCounter) -> (ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, Self) //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize> //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
+    pub fn new(pipeline_message_counter: &PipelineMessageCounter) -> (ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, Self) //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize> //input_receiver: Receiver<ReadFrameProcessorActorInputMessage>) -> Self
     {
 
         /*
@@ -71,7 +71,7 @@ impl ReadFrameProcessorActorState
 
     }
 
-    pub fn spawn(pipeline_message_counter: &PipelineMessageCounter) -> ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage> //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize>
+    pub fn spawn(pipeline_message_counter: &PipelineMessageCounter) -> ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage> //in_the_read_pipeline_count: Decrementor //&Arc<AtomicUsize>
     {
 
         let (io_client, state) = ReadFrameProcessorActorState::new(pipeline_message_counter); //in_the_read_pipeline_count);

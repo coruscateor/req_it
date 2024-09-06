@@ -24,7 +24,7 @@ use super::OwnedFrame;
 
 //use crate::actors::websockets::fastwebsockets::pipeline_message_counter::Incrementor;
 
-use libsync::std::{PipelineMessageCounter, IncrementedPipelineMessageCounter, CountedPipelineMessage, MutCountedPipelineMessage};
+use libsync::std::{PipelineMessageCounter, IncrementedPipelineMessageCounter, CountedPipelineMessage, CountedPipelineMessageMut};
 
 use libsync::crossbeam::mpmc::tokio::array_queue::{Sender, Receiver, channel};
 
@@ -40,7 +40,7 @@ pub struct WriteFrameProcessorActorIOClient
     web_socket_input_sender: Sender<WebSocketActorInputMessage>,
     //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>,
     //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>
-    read_frame_actor_io_client: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
+    read_frame_actor_io_client: ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>,
     //in_the_read_pipeline_count: Arc<AtomicUsize>
     //pipeline_message_count_decrementor: Decrementor
     pipeline_message_counter: PipelineMessageCounter
@@ -50,7 +50,7 @@ pub struct WriteFrameProcessorActorIOClient
 impl WriteFrameProcessorActorIOClient
 {
 
-    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_input_sender: Sender<WebSocketActorInputMessage>, read_frame_actor_io_client: ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Self  //, pipeline_message_count_decrementor: Decrementor) -> Self  //, incrementor: Incrementor) -> Self  //in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
+    pub fn new(sender: Sender<WriteFrameProcessorActorInputMessage>, web_socket_input_sender: Sender<WebSocketActorInputMessage>, read_frame_actor_io_client: ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>, pipeline_message_counter: &PipelineMessageCounter) -> Self  //, pipeline_message_count_decrementor: Decrementor) -> Self  //, incrementor: Incrementor) -> Self  //in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //web_socket_actor_io_client: ActorIOClient<WebSocketActorInputMessage, WebSocketActorOutputMessage>, read_frame_actor_io_client: ActorIOClient<ReadFrameProcessorActorInputMessage, ReadFrameProcessorActorOutputMessage>, in_the_read_pipeline_count: Arc<AtomicUsize>) -> Self //read_frame_proccessor_output_receiver: Arc<Mutex<Receiver<ReadFrameProcessorActorOutputMessage>>>) -> Self //Receiver<ReadFrameProcessorActorOutputMessage>) -> Self
     {
 
         Self
@@ -77,7 +77,7 @@ impl WriteFrameProcessorActorIOClient
 
     impl_get_ref!(web_socket_input_sender, Sender<WebSocketActorInputMessage>);
 
-    impl_get_ref!(read_frame_actor_io_client, ActorIOClient<MutCountedPipelineMessage<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>);
+    impl_get_ref!(read_frame_actor_io_client, ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>);
 
     delegate! {
         to self.pipeline_message_counter {

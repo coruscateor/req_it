@@ -26,7 +26,16 @@ pub enum WebSocketActorFormat
 
 //static CONNECTION_FAILED_MESSAGE: &str = "Connection Faild";
 
+/*
+#[derive(Debug)]
+pub enum FromReadWebSocketActorMessage
+{
 
+    //SendPongFrame(OwnedFrame),
+    SendCloseFrame
+
+}
+*/
 
 //A request is sent to the WebSocket actor to connect to a server.
 
@@ -40,11 +49,13 @@ pub enum WebSocketActorFormat
 pub enum WebSocketActorInputMessage
 {
 
-    ConnectTo(String), //, Sender<()>) //URL, Has the WebSockect actor started trying to connect to the server?
+    ConnectTo(String), //URL, Has the WebSockect actor started trying to connect to the server?
     Disconnect,
     WriteFrame(OwnedFrame),
     //SendPing(SendableText),
     //SendPingZero
+    //FromReadWebSocketActor(FromReadWebSocketActorMessage)
+    Exit //The WebSocketActor has to be manually told to exit.
 
 }
 
@@ -55,7 +66,7 @@ pub enum WebSocketActorOutputClientMessage
 {
 
     ConnectionSucceed(SendableText),
-    ConnectionFailed(SendableText),
+    ConnectionError(SendableText),
     Disconnected(SendableText),
     Disconnecting(SendableText),
     NotConnected(SendableText),
@@ -75,7 +86,7 @@ impl AsStr for WebSocketActorOutputClientMessage
         {
 
             WebSocketActorOutputClientMessage::ConnectionSucceed(message) |
-            WebSocketActorOutputClientMessage::ConnectionFailed(message) |
+            WebSocketActorOutputClientMessage::ConnectionError(message) |
             WebSocketActorOutputClientMessage::Disconnected(message) |
             WebSocketActorOutputClientMessage::NotConnected(message) |
             WebSocketActorOutputClientMessage::Disconnecting(message) |
