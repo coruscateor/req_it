@@ -1177,8 +1177,8 @@ impl WebSocketTabState
             up_rc_pt(sto.state(), |this|
             {
                 
-                let mut receiver = this.write_frame_processor_actor_io_client.read_frame_actor_io_client().output_receiver(); //.try_recv(); //.output_receiver_lock().expect("Error: read_frame_actor_io_client().output_receiver_lock() panicked");
-
+                let receiver = this.write_frame_processor_actor_io_client.read_frame_output_receiver(); //mut //.read_frame_actor_io_client().output_receiver(); //.try_recv(); //.output_receiver_lock().expect("Error: read_frame_actor_io_client().output_receiver_lock() panicked");
+                
                 match receiver.try_recv()
                 {
 

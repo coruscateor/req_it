@@ -55,7 +55,7 @@ pub enum WebSocketActorInputMessage
     //SendPing(SendableText),
     //SendPingZero
     //FromReadWebSocketActor(FromReadWebSocketActorMessage)
-    Exit //The WebSocketActor has to be manually told to exit.
+    //Exit //The WebSocketActor has to be manually told to exit.
 
 }
 

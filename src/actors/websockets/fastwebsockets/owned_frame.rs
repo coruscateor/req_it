@@ -121,8 +121,7 @@ impl OwnedFrame
         payload.copy_from_slice(&frame.payload);
         
     }
-
-
+    
     pub fn reset(&mut self,)
     {
 

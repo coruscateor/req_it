@@ -50,3 +50,6 @@ url = "2.5.*"
 
 #libsync = { path="../libsync", features = ["std", "crossbeam", "tokio"] } #, features = ["std", "crossbeam", "tokio"]}
 
+crossbeam = "0.8.4"
+
+
