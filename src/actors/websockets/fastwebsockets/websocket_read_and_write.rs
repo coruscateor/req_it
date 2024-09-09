@@ -26,7 +26,7 @@ pub enum WebSocketReader
 impl WebSocketReader
 {
 
-    pub fn is_websocket(&self) -> bool
+    pub fn is_web_socket_reader(&self) -> bool
     {
 
         if let WebSocketReader::WebSocketRead(_) = self
@@ -40,7 +40,7 @@ impl WebSocketReader
 
     }
 
-    pub fn is_fragmentcollectorRead(&self) -> bool
+    pub fn is_fragment_collector_read(&self) -> bool
     {
 
         if let WebSocketReader::FragmentCollectorRead(_) = self
