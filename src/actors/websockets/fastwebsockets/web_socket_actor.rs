@@ -64,7 +64,7 @@ static CONNECTION_SUCCEEDED: &str = "Connection succeeded!";
 
 static ERROR_EMPTY_URL_PROVIDED: &str = "Error: Empty URL provided.";
 
-static SERVER_DISCONNECTED: &str = "Server disconnected";
+static DISCONNECTED_FROM_SERVER: &str = "Disconnected from server.";
 
 static ERROR_NO_SERVER_CONNECTED: &str = "Error: No server connected.";
 
@@ -160,11 +160,11 @@ impl<Fut> hyper::rt::Executor<Fut> for SpawnExecutor
 pub struct WebSocketActorState
 {
 
-    input_receiver: Receiver<WebSocketActorInputMessage>,
+    input_receiver: Receiver<WebSocketActorInputMessage>, //From WriteFrameProcessorActor
     url: Option<Url>,
     pipeline_message_counter: PipelineMessageCounter,
-    read_web_socket_actor_io_client: ActorIOClient<ReadWebSocketActorInputMessage, WebSocketActorInputMessage>,
-    read_frame_processor_actor_input_sender: Sender<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>>
+    read_web_socket_actor_io_client: ActorIOClient<ReadWebSocketActorInputMessage, WebSocketActorInputMessage>, //To/From the ReadWebSocketActor (handles the read side of the stream).
+    read_frame_processor_actor_input_sender: Sender<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>> //To the ReadFrameProcessorActor, bypassing the associated ReadWebSocketActor for connection status notifications, erors etc.
 
 }
 
@@ -173,6 +173,8 @@ impl WebSocketActorState
 
     pub fn new(input_receiver: Receiver<WebSocketActorInputMessage>, pipeline_message_counter: &PipelineMessageCounter, read_frame_processor_actor_input_sender: &Sender<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>>) -> Self
     {
+
+        //Spawn the ReadWebSocketActor
 
         let read_web_socket_actor_io_client = ReadWebSocketActorState::spawn(read_frame_processor_actor_input_sender, &pipeline_message_counter);
 
@@ -294,12 +296,31 @@ impl WebSocketActorState
 
         }
 
-        let connection_stream = TcpStream::connect(&host_and_port).await?;
+        //May just have to be host and port number...
+
+        let connection_stream = TcpStream::connect(&host_and_port).await?; //url.as_str()).await?; //&host_and_port).await?;
+
+        /*
+        let host_str;
+
+        if let Some(value) = url.host_str()
+        {
+
+            host_str = value;
+
+        }
+        else
+        {
+
+            return Result::Err(Error::msg("Host section not found in the provided URL."));
+            
+        }
+        */
 
         let request = Request::builder()
             .method("GET")
             .uri(url.as_str())
-            .header("Host", host_and_port)
+            .header("Host", host_and_port) //host_str) //host_and_port)
             .header(UPGRADE, "websocket")
             .header(CONNECTION, "upgrade")
             .header("Sec-WebSocket-Key", handshake::generate_key())
@@ -313,35 +334,44 @@ impl WebSocketActorState
     }
 
     ///
-    /// Shuts down and drops the connection. The WebSocket connection closure process should've been comnpleted by this point.
+    /// Shuts down and drops the connection. The WebSocket connection closure process should've been completed by this point.
     /// 
-    async fn disconnect_from_server(&mut self, mut web_socket_writer: WebSocketWriteHalf, received_close_frame: bool) -> Option<ConnectedLoopExitReason>
+    async fn disconnect_from_server(&mut self, mut web_socket_writer: WebSocketWriteHalf, received_close_frame: bool, sent_close_frame: bool) -> Option<ConnectedLoopExitReason>
     {
 
         //If received_close_frame is false, send the close response frame, otherwise initiate the connection closure process.
 
-        if let Err(err) = self.send_close_frame(&mut web_socket_writer).await
+        if !sent_close_frame
         {
 
-            let res = self.on_web_socket_error_report_only(err).await;
-
-            if !Self::continue_or_not(&res)
+            if let Err(err) = self.send_close_frame(&mut web_socket_writer).await
             {
+    
+                let res = self.on_web_socket_error_report_only(err).await;
+    
+                if !Self::continue_or_not(&res)
+                {
+    
+                    return res;
+    
+                }
 
-                return res;
+                /*
+                let message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::CloseFrameReceived(SendableText::Str(CLOSE_FRAME_SENT))));
+        
+                if let Err(_err) = self.read_frame_processor_actor_input_sender.send(message).await
+                {
+                    
+                    return Some(ConnectedLoopExitReason::ReadFrameProcessorActorDropped);
+
+                }
+                */
 
             }
 
         }
 
-        let counted = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnecting(SendableText::Str(CLOSE_FRAME_SENT))));
-
-        if let Err(_) = self.read_frame_processor_actor_input_sender.send(counted).await
-        {
-
-            return Some(ConnectedLoopExitReason::ReadFrameProcessorActorDropped);
-
-        }
+        //Receiving frames only.
 
         if !received_close_frame
         {
@@ -354,6 +384,8 @@ impl WebSocketActorState
 
             //Disconnection loop
             
+            //Loop because you don't know if the next frame is the close frame.
+
             loop
             {
                 
@@ -403,6 +435,8 @@ impl WebSocketActorState
         
                                             OpCode::Close =>
                                             {
+
+                                                //Close frame response received.
         
                                                 let message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::FrameAndMessage(frame, WebSocketActorOutputClientMessage::CloseFrameReceived(SendableText::Str(CLOSE_FRAME_RECEIVED))));
         
@@ -441,13 +475,28 @@ impl WebSocketActorState
                                             OpCode::Ping =>
                                             {
         
+                                                //From cache...
+
+                                                let mut of = OwnedFrame::new();
+
+                                                of.copy_payload_from_other(&frame);
+
+                                                of.pong_setup();
+                                                
                                                 let message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::FrameAndMessage(frame, WebSocketActorOutputClientMessage::PingFrameReceived(SendableText::Str(PING_FRAME_RECEIVED))));
-        
+
                                                 if let Err(_err) = self.read_frame_processor_actor_input_sender.send(message).await
                                                 {
                                         
                                                     return Some(ConnectedLoopExitReason::ReadFrameProcessorActorDropped);
                             
+                                                }
+
+                                                if let Err(_) = self.write_frame(&mut web_socket_writer, of).await
+                                                {
+
+                                                    return Some(ConnectedLoopExitReason::ReadFrameProcessorActorDropped);
+
                                                 }
         
                                             }
@@ -481,6 +530,15 @@ impl WebSocketActorState
                 
                         }
 
+                        //Tell the ReadWebSocketActor to drop its side of the WebSocket stream.
+
+                        if let Err(_) = self.read_web_socket_actor_io_client.input_sender().send(ReadWebSocketActorInputMessage::Disconnect).await
+                        {
+
+                            return Some(ConnectedLoopExitReason::ReadFrameProcessorActorDropped);
+
+                        }
+
                         break;
 
                     }
@@ -510,7 +568,7 @@ impl WebSocketActorState
 
         self.url = None;
 
-        let message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(SendableText::Str(SERVER_DISCONNECTED))));
+        let message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::Disconnected(SendableText::Str(DISCONNECTED_FROM_SERVER))));
 
         if let Err(_) = self.read_frame_processor_actor_input_sender.send(message).await
         {
@@ -599,6 +657,8 @@ impl WebSocketActorState
                 self.url = Some(parsed_url);
 
                 //Connected!
+
+                //Send a notification to the UI.
 
                 let counted_message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::ConnectionSucceed(SendableText::Str(CONNECTION_SUCCEEDED))));
 
@@ -795,7 +855,7 @@ impl WebSocketActorState
 
                             }
 
-                            if !Self::continue_or_not(&self.disconnect_from_server(web_socket_writer, false).await)
+                            if !Self::continue_or_not(&self.disconnect_from_server(web_socket_writer, false, false).await)
                             {
         
                                 return false;
@@ -830,7 +890,7 @@ impl WebSocketActorState
 
                             //Likely user initiated disconnection
 
-                            return Self::continue_or_not(&self.disconnect_from_server(web_socket_writer, false).await);
+                            return Self::continue_or_not(&self.disconnect_from_server(web_socket_writer, false, false).await);
 
                         }
                         WebSocketActorInputMessage::WriteFrame(frame) =>
@@ -852,7 +912,16 @@ impl WebSocketActorState
                             if opcode == OpCode::Close
                             {
 
-                                return Self::continue_or_not( &self.disconnect_from_server(web_socket_writer, from_server).await);
+                                let message = self.pipeline_message_counter.increment_with_message_mut(ReadFrameProcessorActorInputMessage::ClientMessage(WebSocketActorOutputClientMessage::CloseFrameReceived(SendableText::Str(CLOSE_FRAME_SENT))));
+        
+                                if let Err(_err) = self.read_frame_processor_actor_input_sender.send(message).await
+                                {
+                                    
+                                    return false;
+                
+                                }                
+
+                                return Self::continue_or_not( &self.disconnect_from_server(web_socket_writer, from_server, true).await);
 
                             }
 
@@ -951,10 +1020,10 @@ enum ReadWebSocketActorInputMessage
 struct ReadWebSocketActorState
 {
 
-    read_frame_processor_actor_io_sender: Sender<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>>,
+    read_frame_processor_actor_io_sender: Sender<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>>, //To the ReadFrameProcessorActor (the next stage).
     pipeline_message_counter: PipelineMessageCounter,
-    obligated_send_frame_holder: Arc<ArrayQueue<OwnedFrame>>,
-    io_server: ActorIOServer<ReadWebSocketActorInputMessage, WebSocketActorInputMessage> //Outputs to is contaning WebSocketActor.
+    obligated_send_frame_holder: Arc<ArrayQueue<OwnedFrame>>, //A handy work-around.
+    io_server: ActorIOServer<ReadWebSocketActorInputMessage, WebSocketActorInputMessage> //Outputs to the "contaning" WebSocketActor.
 
 }
 
@@ -1055,10 +1124,10 @@ impl ReadWebSocketActorState
 
             of.copy_all_from_read_frame(&obligated_send_frame);
 
+            let _ = obligated_send_frame_holder.push(of).expect("Error: The obligated_send_frame_holder should've been checked.");
+
             async
             {
-
-                let _ = obligated_send_frame_holder.push(of).expect("Error: The obligated_send_frame_holder should've been checked.");
 
                 Result::<(), WebSocketError>::Ok(())
 
@@ -1183,7 +1252,7 @@ impl ReadWebSocketActorState
                         Ok(frame) =>
                         {
 
-                            //Get from cache
+                            //Get from cache...
 
                             let mut of = OwnedFrame::new();
 

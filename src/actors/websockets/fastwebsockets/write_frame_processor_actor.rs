@@ -84,8 +84,8 @@ impl WriteFrameProcessorActorIOClient
 
     //impl_get_ref!(read_frame_actor_io_client, ActorIOClient<CountedPipelineMessageMut<ReadFrameProcessorActorInputMessage>, ReadFrameProcessorActorOutputMessage>);
 
-    impl_get_ref!(read_frame_output_receiver, Receiver<ReadFrameProcessorActorOutputMessage>)
-;
+    impl_get_ref!(read_frame_output_receiver, Receiver<ReadFrameProcessorActorOutputMessage>);
+    
     delegate! {
         to self.pipeline_message_counter {
 

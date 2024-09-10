@@ -121,6 +121,35 @@ impl OwnedFrame
         payload.copy_from_slice(&frame.payload);
         
     }
+
+    pub fn copy_payload_from_other(&mut self, other: &Self)
+    {
+
+        let payload = &mut self.payload;
+
+        let frame_payload_len = other.payload.len();
+
+        if payload.len() != frame_payload_len
+        {
+
+            payload.resize(frame_payload_len, 0)
+
+        }
+
+        payload.copy_from_slice(&other.payload);
+        
+    }
+
+    pub fn copy_all_from_other(&mut self, other: &Self)
+    {
+
+        self.fin = other.fin;
+
+        self.opcode = other.opcode;
+
+        self.copy_payload_from_other(&other);
+
+    }
     
     pub fn reset(&mut self,)
     {
